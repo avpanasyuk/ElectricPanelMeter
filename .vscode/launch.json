@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "gdb",
+            "request": "launch",
+            "cwd": "${workspaceRoot}",
+            "name": "PlatformIO Debugger",
+            "target": "f:/Dropbox/PERSONAL/GIT_REPS/PROJECTS/PRIVATE/ESP8266/171207-111351-nodemcu/.pioenvs/nodemcu/firmware.elf",
+            "gdbpath": "C:/Users/panasyuk/.platformio/penv/Scripts/piodebuggdb",
+            "autorun": [ "source .pioinit" ]
+        }
+    ]
+}
