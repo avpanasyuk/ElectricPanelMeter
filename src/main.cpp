@@ -1,9 +1,9 @@
 #include <Arduino.h>
-#include <stdint.h>
 #include <ESP8266WiFi.h>
+#include <stdint.h>
 
-const char* ssid = "T2_4";
-const char* password = "group224";
+const char *ssid = "T2_4";
+const char *password = "group224";
 
 //////////////////////
 // WiFi Definitions //
@@ -13,14 +13,13 @@ const char WiFiAPPSK[] = "esp";
 /////////////////////
 // Pin Definitions //
 /////////////////////
-const int LED_PIN = 5; // Thing's onboard, green LED
-const int ANALOG_PIN = A0; // The only analog pin on the Thing
+const int LED_PIN = 5;      // Thing's onboard, green LED
+const int ANALOG_PIN = A0;  // The only analog pin on the Thing
 const int DIGITAL_PIN = 12; // Digital pin to be read
 
 WiFiServer server(80);
 
-void setupWiFi()
-{
+void setupWiFi() {
   WiFi.mode(WIFI_AP);
 
   // Do a little work to get a unique-ish name. Append the
@@ -41,39 +40,36 @@ void setupWiFi()
   WiFi.softAP(AP_NameChar, WiFiAPPSK);
 }
 
-void initHardware()
-{
+void initHardware() {
   Serial.begin(115200);
   Serial.println();
 
-   pinMode(DIGITAL_PIN, INPUT_PULLUP);
+  pinMode(DIGITAL_PIN, INPUT_PULLUP);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
   // Don't need to set ANALOG_PIN as input,
   // that's all it can be.
 }
 
-void setup()
-{
+void setup() {
   initHardware();
   // setupWiFi();
   Serial.printf("Connecting to %s ", ssid);
 
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
   Serial.println(" connected");
 
   server.begin();
-  Serial.printf("Web server started, open %s in a web browser\n", WiFi.localIP().toString().c_str());
+  Serial.printf("Web server started, open %s in a web browser\n",
+                WiFi.localIP().toString().c_str());
   server.begin();
 }
 
-void loop()
-{
+void loop() {
   // Check if a client has connected
   WiFiClient client = server.available();
   if (!client) {
@@ -107,21 +103,16 @@ void loop()
   s += "Content-Type: text/html\r\n\r\n";
   s += "<!DOCTYPE HTML>\r\n<html>\r\n";
   // If we're setting the LED, print out a message saying we did
-  if (val >= 0)
-  {
+  if (val >= 0) {
     s += "LED is now ";
     s += (val) ? "on" : "off";
-  }
-  else if (val == -2)
-  { // If we're reading pins, print out those values:
+  } else if (val == -2) { // If we're reading pins, print out those values:
     s += "Analog Pin = ";
     s += String(analogRead(ANALOG_PIN));
     s += "<br>"; // Go to the next line.
     s += "Digital Pin 12 = ";
     s += String(digitalRead(DIGITAL_PIN));
-  }
-  else
-  {
+  } else {
     s += "Invalid Request.<br> Try /led/1, /led/0, or /read.";
   }
   s += "</html>\n";
