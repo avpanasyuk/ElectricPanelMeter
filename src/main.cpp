@@ -44,16 +44,33 @@ void initHardware() {
   Serial.begin(115200);
   Serial.println();
 
-  pinMode(DIGITAL_PIN, INPUT_PULLUP);
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
+  // pinMode(DIGITAL_PIN, INPUT_PULLUP);
+  // pinMode(LED_PIN, OUTPUT);
+  // digitalWrite(LED_PIN, LOW);
   // Don't need to set ANALOG_PIN as input,
   // that's all it can be.
 }
 
+static constexpr uint16_t BUFFER_SIZE = 60;
+
+static struct {
+  uint16_t ADC;
+  uint32_t Time;
+} MeasBuffer[BUFFER_SIZE], *CurEntry = MeasBuffer;
+
+static void measurement() {
+  if (CurEntry != MeasBuffer + BUFFER_SIZE) {
+    CurEntry->ADC = analogRead(ANALOG_PIN);
+    CurEntry->Time = micros();
+    CurEntry++;
+  }
+} // measurement
+
 void setup() {
   initHardware();
-  // setupWiFi();
+  delay(3000);
+
+  setupWiFi();
   Serial.printf("Connecting to %s ", ssid);
 
   WiFi.begin(ssid, password);
@@ -67,61 +84,67 @@ void setup() {
   Serial.printf("Web server started, open %s in a web browser\n",
                 WiFi.localIP().toString().c_str());
   server.begin();
+
+  pinMode(D0, OUTPUT);
+  pinMode(D1, OUTPUT);
+  pinMode(D2, OUTPUT);
 }
 
-void loop() {
-  // Check if a client has connected
-  WiFiClient client = server.available();
-  if (!client) {
-    return;
-  }
+static WiFiClient client;
 
-  // Read the first line of the request
-  String req = client.readStringUntil('\r');
-  Serial.println(req);
-  client.flush();
-
-  // Match the request
-  int val = -1; // We'll use 'val' to keep track of both the
-  // request type (read/set) and value if set.
-  if (req.indexOf("/led/0") != -1)
-    val = 0; // Will write LED low
-  else if (req.indexOf("/led/1") != -1)
-    val = 1; // Will write LED high
-  else if (req.indexOf("/read") != -1)
-    val = -2; // Will print pin reads
-  // Otherwise request will be invalid. We'll say as much in HTML
-
-  // Set GPIO5 according to the request
-  if (val >= 0)
-    digitalWrite(LED_PIN, val);
-
-  client.flush();
-
-  // Prepare the response. Start with the common header:
-  String s = "HTTP/1.1 200 OK\r\n";
-  s += "Content-Type: text/html\r\n\r\n";
-  s += "<!DOCTYPE HTML>\r\n<html>\r\n";
-  // If we're setting the LED, print out a message saying we did
-  if (val >= 0) {
-    s += "LED is now ";
-    s += (val) ? "on" : "off";
-  } else if (val == -2) { // If we're reading pins, print out those values:
-    s += "Analog Pin = ";
-    s += String(analogRead(ANALOG_PIN));
-    s += "<br>"; // Go to the next line.
-    s += "Digital Pin 12 = ";
-    s += String(digitalRead(DIGITAL_PIN));
-  } else {
-    s += "Invalid Request.<br> Try /led/1, /led/0, or /read.";
-  }
+static void send_back(const String &message) {
+  String s(F("HTTP/1.1 200 OK\r\n"
+             "Content-Type: text/html\r\n\r\n"
+             "<!DOCTYPE HTML>\r\n<html>\r\n"));
+  s += message;
   s += "</html>\n";
-
-  // Send the response to the client
   client.print(s);
   delay(1);
-  Serial.println("Client disonnected");
+  Serial.println("Client disconnected.");
+  client.stop();
+} // send_back
 
-  // The client will actually be disconnected
-  // when the function returns and 'client' object is detroyed
+static void Set74HC4051_code(uint8_t c) {
+  analogWrite(D0, c & 1);
+  analogWrite(D1, (c >> 1) & 1);
+  analogWrite(D2, (c >> 2) & 1);
+} // Set74HC4051_code
+
+void loop() {
+  if (client) { // client is still waiting data
+    // let's see whether we have finished measurement
+    if (CurEntry == MeasBuffer + BUFFER_SIZE) {
+      String s;
+      for (uint16_t si = 0; si < BUFFER_SIZE; si++) {
+        s += String(MeasBuffer[si].Time) + ", " + String(MeasBuffer[si].ADC) +
+             "<br>";
+      }
+      CurEntry = MeasBuffer;
+      send_back(s);
+    } else
+      measurement();
+  } else {
+    // Check if a client has connected
+    client = server.available();
+    if (client) {
+      // Read the first line of the request
+      String req = client.readStringUntil('\r');
+      Serial.println(req);
+      client.flush();
+
+      // parse request
+      static int Port = -1;
+
+      if ((Port = req.lastIndexOf("/port")) != -1) {
+        // let's read port number
+        Port = (req.charAt(Port + strlen("/port/")) - '0');
+        if (Port < 0 || Port > 7) {
+          send_back(String(F("Wrong port number! <br>")));
+        } else
+          Set74HC4051_code(uint8_t(Port));
+      } else {
+        send_back(String(F("Invalid Request.<br> Try /port/<port>.")));
+      }
+    }
+  }
 }
