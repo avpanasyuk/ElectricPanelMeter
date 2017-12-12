@@ -15,7 +15,6 @@ const char WiFiAPPSK[] = "esp";
 /////////////////////
 const int LED_PIN = 5;      // Thing's onboard, green LED
 const int ANALOG_PIN = A0;  // The only analog pin on the Thing
-const int DIGITAL_PIN = 12; // Digital pin to be read
 
 WiFiServer server(80);
 
@@ -66,6 +65,14 @@ static void measurement() {
   }
 } // measurement
 
+static void Set74HC4051_code(uint8_t c) {
+  digitalWrite(D0, c & 1);
+  digitalWrite(D1, (c >> 1) & 1);
+  digitalWrite(D2, (c >> 2) & 1);
+  Serial.print(F("Port = "));
+  Serial.println(int(c));
+} // Set74HC4051_code
+
 void setup() {
   initHardware();
   delay(3000);
@@ -88,7 +95,11 @@ void setup() {
   pinMode(D0, OUTPUT);
   pinMode(D1, OUTPUT);
   pinMode(D2, OUTPUT);
-}
+
+  Set74HC4051_code(7); // just to test
+  pinMode(LED_PIN,OUTPUT);
+  digitalWrite(LED_PIN,0);
+} // setup
 
 static WiFiClient client;
 
@@ -103,12 +114,6 @@ static void send_back(const String &message) {
   Serial.println("Client disconnected.");
   client.stop();
 } // send_back
-
-static void Set74HC4051_code(uint8_t c) {
-  analogWrite(D0, c & 1);
-  analogWrite(D1, (c >> 1) & 1);
-  analogWrite(D2, (c >> 2) & 1);
-} // Set74HC4051_code
 
 void loop() {
   if (client) { // client is still waiting data
