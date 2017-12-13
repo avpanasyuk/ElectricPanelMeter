@@ -1,3 +1,6 @@
 [submodule "MATLAB/AVP_LIB"]
 	path = MATLAB/AVP_LIB
 	url = git@github.com:avpanasyuk/MATLAB.git
+[submodule "lib/General"]
+	path = lib/General
+	url = git@github.com:avpanasyuk/C_General.git
