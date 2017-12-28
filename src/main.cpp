@@ -16,6 +16,18 @@ const char WiFiAPPSK[] = "esp";
 /////////////////////
 const int LED_PIN = 5;     // Thing's onboard, green LED
 const int ANALOG_PIN = A0; // The only analog pin on the Thing
+static constexpr uint16_t BUFFER_SIZE = 60, NUM_PORTS = 8, VOLTAGE_PORT = 7,
+                          SamplingTime = 3000 /* ms */;
+static constexpr uint16_t SAMPLES_IN_WF = 600;
+
+static uint16_t Waveform[SAMPLES_IN_WF];
+static float ProdIntegral[NUM_PORTS], VoltIntegral[NUM_PORTS],
+    CrntIntegral[NUM_PORTS];
+
+static constexpr uint16_t GetDelay(uint8_t DelIndex) { return 600.*pow(2,DelIndex/4.); }
+
+static uint16_t SampleCount, Delay = GetDelay(5);
+static uint8_t CurPort;
 
 WiFiServer server(80);
 
@@ -58,34 +70,41 @@ int debug_vprintf(const char *format, va_list a) {
   return 1;
 } // debug_vprintf
 
-static constexpr uint16_t BUFFER_SIZE = 60, NUM_PORTS = 8, VOLTAGE_PORT = 7;
-
 static void Set74HC4051_code(uint8_t c) {
   digitalWrite(D0, c & 1);
   digitalWrite(D1, (c >> 1) & 1);
   digitalWrite(D2, (c >> 2) & 1);
   // Serial.print(F("Port = "));
   // Serial.println(int(c));
-  delayMicroseconds(10);
+  // delay(Delay);
+  delayMicroseconds(Delay);
 } // Set74HC4051_code
 
-static float ProdIntegral[NUM_PORTS], VoltIntegral[NUM_PORTS],
-    CrntIntegral[NUM_PORTS];
-static uint16_t SampleCount;
+static void sample_waveform() {
+  Set74HC4051_code(VOLTAGE_PORT);
+  Set74HC4051_code(CurPort);
+  Waveform[SampleCount++] = analogRead(ANALOG_PIN);
+  yield();
+} // sample_waveform
 
 static void sample_all_ports() {
   // each time we go over all the ports and add product to ProdIntergral
+  Set74HC4051_code(VOLTAGE_PORT);
+  float PrevVoltage = analogRead(ANALOG_PIN);
   for (uint8_t PortI = 0; PortI < NUM_PORTS; PortI++) {
     Set74HC4051_code(PortI);
     float Current = analogRead(ANALOG_PIN);
     Set74HC4051_code(VOLTAGE_PORT);
     float Voltage = analogRead(ANALOG_PIN);
-    ProdIntegral[PortI] += Voltage * Current;
-    VoltIntegral[PortI] += Voltage;
+    float MeanVoltage = (Voltage + PrevVoltage)/2.; // compensating for time delay
+    // between voltage and current sampling
+    PrevVoltage = Voltage;
+    ProdIntegral[PortI] += MeanVoltage * Current;
+    VoltIntegral[PortI] += MeanVoltage;
     CrntIntegral[PortI] += Current;
-    yield();
   }
-  SampleCount++;
+  yield();
+  ++SampleCount;
 } // sample_all_ports
 
 void setup() {
@@ -111,7 +130,7 @@ void setup() {
   pinMode(D1, OUTPUT);
   pinMode(D2, OUTPUT);
 
-Set74HC4051_code(VOLTAGE_PORT);
+  Set74HC4051_code(VOLTAGE_PORT);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, 0);
 } // setup
@@ -130,25 +149,48 @@ static void reply(const String &message) {
   client.stop();
 } // reply
 
+static enum { SamplingPorts, SamplingWF } State;
+
 void loop() {
   static uint32_t SamplingEnd;
 
   if (client) { // client is still waiting for data
     // let's see whether we have finished sample_all_ports
-    if (millis() - SamplingEnd < (1UL << 31)) {
-      String s(String(SampleCount) +
-               "<br>----------------------------------<br>");
-      for (uint8_t PortI = 0; PortI < NUM_PORTS; PortI++) {
-        float Pwr = /*ProdIntegral[PortI]; */(ProdIntegral[PortI] -
-                     CrntIntegral[PortI] * VoltIntegral[PortI] / SampleCount) /
-                    SampleCount;
-        s += String(Pwr) + "<br>";
-        ProdIntegral[PortI] = CrntIntegral[PortI] = VoltIntegral[PortI] = 0;
+    switch (State) {
+    case SamplingPorts:
+      if (millis() - SamplingEnd < (1UL << 31)) {
+        String s(String(SampleCount) +
+                 "<br>----------------------------------<br>");
+        for (uint8_t PortI = 0; PortI < NUM_PORTS; PortI++) {
+#if 1
+          float Pwr =
+              (ProdIntegral[PortI] -
+               CrntIntegral[PortI] * VoltIntegral[PortI] / SampleCount) /
+              SampleCount;
+          s += String(Pwr) + "<br>";
+#else
+          s += String(ProdIntegral[PortI]) + " " String(VoltIntegral[PortI]) +
+               " " + String(CrntIntegral[PortI]) + "<br>";
+#endif
+          ProdIntegral[PortI] = CrntIntegral[PortI] = VoltIntegral[PortI] = 0;
+        }
+        SampleCount = 0;
+        reply(s);
+      } else
+        sample_all_ports();
+      break;
+    case SamplingWF:
+      if (SampleCount < SAMPLES_IN_WF)
+        sample_waveform();
+      else {
+        String s;
+        for (uint16_t SampleI = 0; SampleI < SAMPLES_IN_WF; ++SampleI)
+          s += String(Waveform[SampleI]) + " ";
+        SampleCount = 0;
+        reply(s);
       }
-      SampleCount = 0;
-      reply(s);
-    } else
-      sample_all_ports();
+      break;
+    }
   } else {
     // Check if a client has connected
     client = server.available();
@@ -161,9 +203,10 @@ void loop() {
       // parse request
       int Port;
 
-      if (req.lastIndexOf("/read") != -1) {
+      if (req.lastIndexOf("/sample") != -1) {
         // let's read port number
-        SamplingEnd = millis() + 1000;
+        SamplingEnd = millis() + SamplingTime;
+        State = SamplingPorts;
       } else if ((Port = req.lastIndexOf("/port")) != -1) {
         // let's read port number
         Port = (req.charAt(Port + strlen("/port/")) - '0');
@@ -175,8 +218,20 @@ void loop() {
           s += String(Port) + ", " + String(analogRead(ANALOG_PIN));
           reply(s);
         }
+      } else if ((Port = req.lastIndexOf("/wave")) != -1) {
+        CurPort = (req.charAt(Port + strlen("/wave/")) - '0');
+        if (CurPort < 0 || CurPort > 7) {
+          reply(String(F("Wrong port number! <br>")));
+        } else {
+          // Set74HC4051_code(uint8_t(Port));
+          State = SamplingWF;
+        }
+      } else if ((Port = req.lastIndexOf("/delay")) != -1) {
+        Delay = GetDelay(req.charAt(Port + strlen("/delay/")) - '0');
+        reply(String(F("Delay is set to ")) + String(Delay) + " microseconds.<br>");
       } else
-        reply(String(F("Invalid Request.<br> Try /read.")));
+        reply(String(
+            F("Invalid Request.<br> Try /sample or /port/? or /wave/?.")));
     }
   }
-}
+} // loop
