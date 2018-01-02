@@ -25,73 +25,46 @@ static struct Integrals_ {
 static uint32_t SampleCount;
 static uint32_t SamplingStarted; // milliseconds
 
-static enum {
-  Idle,
-  SwitchingToVoltage,
-  SwitchingToCurrent
-} SamplingState = Idle;
-
 static constexpr uint32_t GetDelay(uint8_t DelIndex) {
-  return 400UL * pow(2, DelIndex);
+  return 10UL * pow(2, DelIndex);
 } // GetDelay
 
-static uint32_t Delay = GetDelay(3);
-static uint32_t EndDelay = micros();
+static constexpr uint16_t SAMPLES_IN_WF = 600;
+static constexpr uint32_t WF_SAMPLE_INTERVAL =
+    1000000UL / SAMPLES_IN_WF; // microseconds
+
+static uint32_t Delay = GetDelay(5); // tuned for no visible phase shift
+static uint32_t NewSample = micros();
 
 static void Set74HC4051_code(uint8_t c) {
   digitalWrite(D0, c & 1);
   digitalWrite(D1, (c >> 1) & 1);
   digitalWrite(D2, (c >> 2) & 1);
+  delayMicroseconds(Delay);
 } // Set74HC4051_code
 
 static inline bool is_past(uint32_t time_us) {
-  return (micros() - EndDelay) < (1UL << 31);
+  return (micros() - time_us) < (1UL << 31);
 } // is_past
 
-static uint8_t PortI;
-static float Voltage0;
-
 static void start_sampling() {
-  Set74HC4051_code(VOLTAGE_PORT);
-  delayMicroseconds(Delay);
-  Voltage0 = analogRead(ANALOG_PIN);
-  Set74HC4051_code(PortI = 0);
-  SamplingState = SwitchingToCurrent;
-  EndDelay = micros() + Delay;
+  NewSample = micros();
   SamplingStarted = millis();
 } // start_sampling
 
 static void sample_all_ports() {
-  if (is_past(EndDelay)) { // delay is over
-    static float Current;
-    float Voltage;
+  for (uint8_t PortI = 0; PortI < NUM_PORTS; ++PortI) {
+    uint32_t Voltage, Current;
+    Set74HC4051_code(PortI);
+    Current = analogRead(ANALOG_PIN);
+    Set74HC4051_code(VOLTAGE_PORT);
+    Voltage = analogRead(ANALOG_PIN);
 
-    Integrals_ *pInt = &Integrals[PortI];
-    switch (SamplingState) {
-    case SwitchingToCurrent:
-      Current = analogRead(ANALOG_PIN);
-      Set74HC4051_code(VOLTAGE_PORT);
-      SamplingState = SwitchingToVoltage;
-      break;
-    case SwitchingToVoltage:
-      Voltage = analogRead(ANALOG_PIN);
-      Voltage0 = (Voltage + Voltage0) / 2.; // compensating for time delay
-      // between voltage and current sampling
-      pInt->Power += Voltage0 * Current;
-      pInt->Voltage += Voltage0;
-      pInt->Current += Current;
-      Voltage0 = Voltage;
-
-      if (++PortI == NUM_PORTS) {
-        PortI = 0;
-        SampleCount++;
-      }
-      Set74HC4051_code(PortI);
-      SamplingState = SwitchingToCurrent;
-      break;
-    }
-    EndDelay = micros() + Delay;
+    Integrals[PortI].Power += Voltage * Current;
+    Integrals[PortI].Voltage += Voltage;
+    Integrals[PortI].Current += Current;
   }
+  SampleCount++;
 } // sample_all_ports
 
 WiFiServer server(80);
@@ -171,15 +144,12 @@ static void reply(const String &message) {
 } // reply
 
 static uint16_t WF_sampling_count;
-static constexpr uint16_t SAMPLES_IN_WF = 600;
 
 static void sample_waveform() {
-  static constexpr uint32_t WF_SAMPLE_INTERVAL =
-      1000000UL / SAMPLES_IN_WF; // microseconds
-  static uint16_t Waveform[SAMPLES_IN_WF];
+    static uint16_t Waveform[SAMPLES_IN_WF];
   // Serial.printf("%lu-%lu..", micros(), EndDelay);
 
-  if (is_past(EndDelay)) {
+  if (is_past(NewSample)) {
     Waveform[--WF_sampling_count] = analogRead(ANALOG_PIN);
     // Serial.printf("%d..", WF_sampling_count);
     if (WF_sampling_count == 0) {
@@ -188,7 +158,7 @@ static void sample_waveform() {
         s += String(Waveform[SampleI]) + " ";
       reply(s);
     }
-    EndDelay = micros() + WF_SAMPLE_INTERVAL;
+    NewSample = micros() + WF_SAMPLE_INTERVAL;
   }
 } // sample_waveform
 
@@ -197,15 +167,17 @@ void loop() {
     if (WF_sampling_count)
       sample_waveform();
   } else {
-    uint8_t LEDstate = 1;
-    digitalWrite(LED_PIN, LEDstate = 1 -LEDstate);
-
-    if (SamplingState != Idle)
+    if (is_past(NewSample)) { // delay is over
       sample_all_ports();
+      NewSample = micros() + WF_SAMPLE_INTERVAL*10;
+    }
 
     // Check if a client has connected
     client = server.available();
     if (client) {
+      uint8_t LEDstate = 1;
+      digitalWrite(LED_PIN, LEDstate = 1 - LEDstate);
+
       // Read the first line of the request
       String req = client.readStringUntil('\r');
       Serial.println(req);
@@ -216,8 +188,9 @@ void loop() {
 
       if (req.lastIndexOf("/sample") != -1) {
         float SamplingTime = millis() - SamplingStarted;
-        String s(String(SamplingTime/SampleCount) + " ms per sample over " +
-                 String(SamplingTime) + " ms<br>----------------------------------<br>");
+        String s(String(SamplingTime / SampleCount) + " ms per sample over " +
+                 String(SamplingTime) +
+                 " ms<br>----------------------------------<br>");
         for (uint8_t p = 0; p < NUM_PORTS; p++) {
           Integrals_ *pInt = &Integrals[p];
           float Pwr =
@@ -252,6 +225,14 @@ void loop() {
         Delay = GetDelay(req.charAt(Port + strlen("/delay/")) - '0');
         reply(String(F("Delay is set to ")) + String(Delay) +
               " microseconds.<br>");
+      } else if ((Port = req.lastIndexOf("/test")) != -1) {
+        Port = (req.charAt(Port + strlen("/test/")) - '0');
+        uint32_t Start = micros();
+        for (uint16_t n = 10000; n; --n) {
+          analogRead(ANALOG_PIN);
+        }
+        reply(String(F("10000 loops over ")) + String(micros() - Start) +
+              " us");
       } else
         reply(String(
             F("Invalid Request.<br> Try /sample or /port/? or /wave/?.")));
