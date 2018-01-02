@@ -26,16 +26,16 @@ static uint32_t SampleCount;
 static uint32_t SamplingStarted; // milliseconds
 
 static enum {
-  // Idle,
+  Idle,
   SwitchingToVoltage,
   SwitchingToCurrent
-} SamplingState;
+} SamplingState = Idle;
 
 static constexpr uint32_t GetDelay(uint8_t DelIndex) {
-  return 100UL * pow(2, DelIndex / 4.);
+  return 400UL * pow(2, DelIndex);
 } // GetDelay
 
-static uint32_t Delay = GetDelay(5);
+static uint32_t Delay = GetDelay(3);
 static uint32_t EndDelay = micros();
 
 static void Set74HC4051_code(uint8_t c) {
@@ -44,9 +44,9 @@ static void Set74HC4051_code(uint8_t c) {
   digitalWrite(D2, (c >> 2) & 1);
 } // Set74HC4051_code
 
-static bool is_past(uint32_t time_us) {
+static inline bool is_past(uint32_t time_us) {
   return (micros() - EndDelay) < (1UL << 31);
-}
+} // is_past
 
 static uint8_t PortI;
 static float Voltage0;
@@ -67,7 +67,6 @@ static void sample_all_ports() {
     float Voltage;
 
     Integrals_ *pInt = &Integrals[PortI];
-
     switch (SamplingState) {
     case SwitchingToCurrent:
       Current = analogRead(ANALOG_PIN);
@@ -81,9 +80,9 @@ static void sample_all_ports() {
       pInt->Power += Voltage0 * Current;
       pInt->Voltage += Voltage0;
       pInt->Current += Current;
-
       Voltage0 = Voltage;
-      if (PortI++ == NUM_PORTS) {
+
+      if (++PortI == NUM_PORTS) {
         PortI = 0;
         SampleCount++;
       }
@@ -172,15 +171,17 @@ static void reply(const String &message) {
 } // reply
 
 static uint16_t WF_sampling_count;
-  static constexpr uint16_t SAMPLES_IN_WF = 600;
+static constexpr uint16_t SAMPLES_IN_WF = 600;
 
 static void sample_waveform() {
   static constexpr uint32_t WF_SAMPLE_INTERVAL =
-      1000000 / SAMPLES_IN_WF; // microseconds
+      1000000UL / SAMPLES_IN_WF; // microseconds
   static uint16_t Waveform[SAMPLES_IN_WF];
+  // Serial.printf("%lu-%lu..", micros(), EndDelay);
 
   if (is_past(EndDelay)) {
     Waveform[--WF_sampling_count] = analogRead(ANALOG_PIN);
+    // Serial.printf("%d..", WF_sampling_count);
     if (WF_sampling_count == 0) {
       String s;
       for (uint16_t SampleI = 0; SampleI < SAMPLES_IN_WF; ++SampleI)
@@ -195,60 +196,65 @@ void loop() {
   if (client) {
     if (WF_sampling_count)
       sample_waveform();
-  } else
-    sample_all_ports();
+  } else {
+    uint8_t LEDstate = 1;
+    digitalWrite(LED_PIN, LEDstate = 1 -LEDstate);
 
-  // Check if a client has connected
-  client = server.available();
-  if (client) {
-    // Read the first line of the request
-    String req = client.readStringUntil('\r');
-    Serial.println(req);
-    client.flush();
+    if (SamplingState != Idle)
+      sample_all_ports();
 
-    // parse request
-    int Port;
+    // Check if a client has connected
+    client = server.available();
+    if (client) {
+      // Read the first line of the request
+      String req = client.readStringUntil('\r');
+      Serial.println(req);
+      client.flush();
 
-    if (req.lastIndexOf("/sample") != -1) {
-      String s(String(SampleCount) + " samples over " +
-               String(millis() - SamplingStarted) +
-               " us<br>----------------------------------<br>");
-      for (uint8_t p = 0; p < NUM_PORTS; p++) {
-        Integrals_ *pInt = &Integrals[p];
-        float Pwr =
-            (pInt->Power - pInt->Current * pInt->Voltage / SampleCount) /
-            SampleCount;
-        s += String(Pwr) + "<br>";
-        pInt->Power = pInt->Current = pInt->Voltage = 0;
-      }
-      reply(s);
-      SampleCount = 0;
-      SamplingStarted = millis();
-    } else if ((Port = req.lastIndexOf("/port")) != -1) {
-      // let's read port number
-      Port = (req.charAt(Port + strlen("/port/")) - '0');
-      if (Port < 0 || Port > 7) {
-        reply(String(F("Wrong port number! <br>")));
-      } else {
-        Set74HC4051_code(uint8_t(Port));
-        String s("Port  =");
-        s += String(Port) + ", " + String(analogRead(ANALOG_PIN));
+      // parse request
+      int Port;
+
+      if (req.lastIndexOf("/sample") != -1) {
+        float SamplingTime = millis() - SamplingStarted;
+        String s(String(SamplingTime/SampleCount) + " ms per sample over " +
+                 String(SamplingTime) + " ms<br>----------------------------------<br>");
+        for (uint8_t p = 0; p < NUM_PORTS; p++) {
+          Integrals_ *pInt = &Integrals[p];
+          float Pwr =
+              (pInt->Power - pInt->Current * pInt->Voltage / SampleCount) /
+              SampleCount;
+          s += String(Pwr) + "<br>";
+          pInt->Power = pInt->Current = pInt->Voltage = 0;
+        }
         reply(s);
-      }
-    } else if ((Port = req.lastIndexOf("/wave")) != -1) {
-      Port = (req.charAt(Port + strlen("/wave/")) - '0');
-      if (Port < 0 || Port > 7) {
-        reply(String(F("Wrong port number! <br>")));
-      } else {
-        Set74HC4051_code(uint8_t(Port));
-        WF_sampling_count = SAMPLES_IN_WF;
-      }
-    } else if ((Port = req.lastIndexOf("/delay")) != -1) {
-      Delay = GetDelay(req.charAt(Port + strlen("/delay/")) - '0');
-      reply(String(F("Delay is set to ")) + String(Delay) +
-            " microseconds.<br>");
-    } else
-      reply(
-          String(F("Invalid Request.<br> Try /sample or /port/? or /wave/?.")));
+        SampleCount = 0;
+        SamplingStarted = millis();
+      } else if ((Port = req.lastIndexOf("/port")) != -1) {
+        // let's read port number
+        Port = (req.charAt(Port + strlen("/port/")) - '0');
+        if (Port < 0 || Port > 7) {
+          reply(String(F("Wrong port number! <br>")));
+        } else {
+          Set74HC4051_code(uint8_t(Port));
+          String s("Port  =");
+          s += String(Port) + ", " + String(analogRead(ANALOG_PIN));
+          reply(s);
+        }
+      } else if ((Port = req.lastIndexOf("/wave")) != -1) {
+        Port = (req.charAt(Port + strlen("/wave/")) - '0');
+        if (Port < 0 || Port > 7) {
+          reply(String(F("Wrong port number! <br>")));
+        } else {
+          Set74HC4051_code(uint8_t(Port));
+          WF_sampling_count = SAMPLES_IN_WF;
+        }
+      } else if ((Port = req.lastIndexOf("/delay")) != -1) {
+        Delay = GetDelay(req.charAt(Port + strlen("/delay/")) - '0');
+        reply(String(F("Delay is set to ")) + String(Delay) +
+              " microseconds.<br>");
+      } else
+        reply(String(
+            F("Invalid Request.<br> Try /sample or /port/? or /wave/?.")));
+    }
   }
 } // loop
