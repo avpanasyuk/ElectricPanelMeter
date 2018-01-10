@@ -4,9 +4,6 @@
 #include <stdio.h>
 #include <EEPROM.h>
 
-const char *ssid = "T2_4";
-const char *password = "group224";
-
 //////////////////////
 // WiFi Definitions //
 //////////////////////
@@ -109,14 +106,61 @@ int debug_vprintf(const char *format, va_list a) {
   return 1;
 } // debug_vprintf
 
+namespace AVP {
+  //! writes or reads byte by byte in sequence
+  class EEPROM_ {
+    static uint16_t CurPos;
+    static uint8_t CS; //!< is written to EEPROM as bitwise NOT, so if EEPROM is all 0 check fails
+  public:
+    static void SetPos(uint16_t Pos = 0) { CurPos = Pos; CS = 0; }
+    static void write(uint8_t value) {
+      // Serial.print(value,DEC); Serial.print(',');
+      EEPROM.write(CurPos++,value);
+      // delay(100);
+      CS += value;
+    } // update
+    static uint8_t read() {
+      uint8_t Out = EEPROM.read(CurPos++);
+      // Serial.print(Out,DEC);  Serial.print(',');
+      CS += Out;
+      return Out;
+    } // read
+    static void WriteString(const String &str) {
+      write(str.length());
+      for(uint8_t ByteI=0; ByteI < str.length(); ByteI++)
+        write(str.charAt(ByteI));
+      write(~CS);
+    } // WriteString
+    static String ReadString() {
+      String Out;
+      uint8_t Size = read();
+      for(; Size; Size--)  Out.concat(char(read()));
+      uint8_t InvCS = ~CS;
+      return  InvCS == read()?Out:String(); // we have to do it this way because read() changes CS
+    } // readString
+  }; // EEPROM
+  uint16_t EEPROM_::CurPos;
+  uint8_t EEPROM_::CS;
+} // namespace AVP
+
 void setup() {
   initHardware();
   delay(3000);
 
-  setupWiFi();
-  Serial.printf("Connecting to %s ", ssid);
+  EEPROM.begin(514);
+  AVP::EEPROM_::SetPos();
+  String SSID = AVP::EEPROM_::ReadString();
+  String Pass = AVP::EEPROM_::ReadString();
+  EEPROM.end();
+  if(!SSID.length() || !Pass.length()) {
+    Serial.println("Can not read from EEPRON, setting to default!");
+    SSID = "T2_4"; Pass = "group224";
+  }
 
-  WiFi.begin(ssid, password);
+  setupWiFi();
+  Serial.printf("Connecting to %s ...", SSID.c_str());
+
+  WiFi.begin(SSID.c_str(), Pass.c_str());
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -162,40 +206,6 @@ static void sample_waveform() {
     NewSample = micros() + WF_SAMPLE_INTERVAL;
   }
 } // sample_waveform
-
-namespace AVP {
-  //! writes or reads byte by byte in sequence
-  class EEPROM_ {
-    static uint16_t CurPos;
-    static uint8_t CS; //!< is written to EEPROM as bitwise NOT, so if EEPROM is all 0 check fails
-  public:
-    static void SetPos(uint16_t Pos = 0) { CurPos = Pos; CS = 0; }
-    static void write(uint8_t value) {
-      EEPROM.write(CurPos++,value);
-      // delay(100);
-      CS += value;
-    } // update
-    static uint8_t read() {
-      uint8_t Out = EEPROM.read(CurPos++);
-      CS += Out;
-      return Out;
-    } // read
-    static void WriteString(const String &str) {
-      write(str.length());
-      for(uint8_t ByteI=0; ByteI < str.length(); ByteI++)
-        write(str.charAt(ByteI));
-      write(~CS);
-    } // WriteString
-    static String ReadString() {
-      String Out;
-      uint8_t Size = read();
-      for(; Size; Size--)  Out.concat(read());
-      return read() == ~CS?Out:String();
-    } // readString
-  }; // EEPROM
-  uint16_t EEPROM_::CurPos;
-  uint8_t EEPROM_::CS;
-} // namespace AVP
 
 void loop() {
   if (client) {
@@ -270,13 +280,14 @@ void loop() {
       } else if ((Port = req.lastIndexOf("/wifi")) != -1) {
         String IDs = req.substring(Port + strlen("/wifi/"));
         int Colon = IDs.indexOf(':');
+        int End = IDs.indexOf(' ');
         String SSID = IDs.substring(0,Colon);
-        String Pass = IDs.substring(Colon+1);
+        String Pass = IDs.substring(Colon+1,End);
         EEPROM.begin(514); // 255 + 1 /* size */ + 1 /* CS */ )*2
         AVP::EEPROM_::SetPos();
         AVP::EEPROM_::WriteString(SSID);
         AVP::EEPROM_::WriteString(Pass);
-        EEPROM.commit();
+        // EEPROM.commit();
         EEPROM.end();
         reply(String(F("WIFI is set to ")) + SSID + ":" + Pass + "<br>");
       } else
