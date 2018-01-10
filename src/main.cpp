@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <EEPROM.h>
 
 const char *ssid = "T2_4";
 const char *password = "group224";
@@ -9,7 +10,7 @@ const char *password = "group224";
 //////////////////////
 // WiFi Definitions //
 //////////////////////
-const char WiFiAPPSK[] = "esp";
+const char WiFiAPPSK[] = "esp12345";
 
 /////////////////////
 // Pin Definitions //
@@ -162,6 +163,40 @@ static void sample_waveform() {
   }
 } // sample_waveform
 
+namespace AVP {
+  //! writes or reads byte by byte in sequence
+  class EEPROM_ {
+    static uint16_t CurPos;
+    static uint8_t CS; //!< is written to EEPROM as bitwise NOT, so if EEPROM is all 0 check fails
+  public:
+    static void SetPos(uint16_t Pos = 0) { CurPos = Pos; CS = 0; }
+    static void write(uint8_t value) {
+      EEPROM.write(CurPos++,value);
+      // delay(100);
+      CS += value;
+    } // update
+    static uint8_t read() {
+      uint8_t Out = EEPROM.read(CurPos++);
+      CS += Out;
+      return Out;
+    } // read
+    static void WriteString(const String &str) {
+      write(str.length());
+      for(uint8_t ByteI=0; ByteI < str.length(); ByteI++)
+        write(str.charAt(ByteI));
+      write(~CS);
+    } // WriteString
+    static String ReadString() {
+      String Out;
+      uint8_t Size = read();
+      for(; Size; Size--)  Out.concat(read());
+      return read() == ~CS?Out:String();
+    } // readString
+  }; // EEPROM
+  uint16_t EEPROM_::CurPos;
+  uint8_t EEPROM_::CS;
+} // namespace AVP
+
 void loop() {
   if (client) {
     if (WF_sampling_count)
@@ -231,11 +266,22 @@ void loop() {
         for (uint16_t n = 10000; n; --n) {
           analogRead(ANALOG_PIN);
         }
-        reply(String(F("10000 loops over ")) + String(micros() - Start) +
-              " us");
+        reply(String(F("10000 loops over ")) + String(micros() - Start) + " us");
+      } else if ((Port = req.lastIndexOf("/wifi")) != -1) {
+        String IDs = req.substring(Port + strlen("/wifi/"));
+        int Colon = IDs.indexOf(':');
+        String SSID = IDs.substring(0,Colon);
+        String Pass = IDs.substring(Colon+1);
+        EEPROM.begin(514); // 255 + 1 /* size */ + 1 /* CS */ )*2
+        AVP::EEPROM_::SetPos();
+        AVP::EEPROM_::WriteString(SSID);
+        AVP::EEPROM_::WriteString(Pass);
+        EEPROM.commit();
+        EEPROM.end();
+        reply(String(F("WIFI is set to ")) + SSID + ":" + Pass + "<br>");
       } else
         reply(String(
-            F("Invalid Request.<br> Try /sample or /port/? or /wave/?.")));
+            F("Invalid Request.<br> Try /sample or /port/? or /wave/? or /wifi/ssid:password.")));
     }
   }
 } // loop
