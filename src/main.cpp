@@ -1,7 +1,8 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
-#include <Macros.h>
+#include <General/Macros.h>
+#include <General/Math.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -17,26 +18,47 @@ const int LED_PIN = 5;     // Thing's onboard, green LED
 const int ANALOG_PIN = A0; // The only analog pin on the Thing
 
 // hardware information about analog switched connections
-static constexpr uint8_t NUM_P1_PORTS = 12;
-static constexpr struct tP1_Pin {
+static constexpr uint8_t NUM_Inputs = 14;
+static constexpr struct tSwitchInput {
   uint8_t PortNum;
   uint8_t IC_num; //!< U2 -> 0, U3 -> 1
-} P1_Port[] =     //! ports are in order they are located on P1
-    {{4, 1}, {6, 1}, {7, 1}, {0, 1}, {5, 1}, {3, 1},
+} SwitchInput[] = //! ports are in order they are located on P1
+    {{2, 1},      // input connected to ground
+     {3, 0},      // input connected to Voltage pickup
+     {4, 1}, {6, 1}, {7, 1}, {0, 1}, {5, 1}, {3, 1}, // connected to P1
      {4, 0}, {6, 0}, {0, 0}, {1, 0}, {7, 0}, {5, 0}};
 
-static constexpr tP1_Pin VoltagePort = {3, 0};
-static constexpr uint8_t OpenPort[2] = {2, 1};
-static constexpr tP1_Pin GND_port = {2, 1};
-static constexpr uint8_t ControlLines[2][3] = {
-    {D2, D1, D0}, {D5, D7, D6}}; // numbers of NodeMCU IO ports
+static constexpr uint8_t FirstP1input = 2;
 
-static_assert(N_ELEMENTS(P1_Port) == NUM_P1_PORTS, "Just checking!");
+// Calibration - for voltage Pin readout is 104000 for 125V input.
+static constexpr float VoltageDivider = 12.85 / 1.89; // input R1/R2 divider
+// Units output for voltage are (Vac/VoltageDivider)^2/GeneralScaler, so
+static constexpr float GeneralScaler =
+    avp::sqr(125. / VoltageDivider) / 104000UL;
+static constexpr float SCT013_coeff = 20.; // 20A are converted to 1V
+// for the P1 pins Power = Vac*Iac = Vac*Vpin*SCT013_coeff. The units are
+// Vac/VoltageDivider*Vpin/GeneralScaler =
+// Power/SCT013_coeff/VoltageDivider/GeneralScaler;
+// so
+static constexpr float WattsInUnit =
+    VoltageDivider * SCT013_coeff * GeneralScaler;
+
+static constexpr tSwitchInput VoltagePort = SwitchInput[1];
+static constexpr uint8_t OpenPort[2] = {2, 1};
+static constexpr tSwitchInput GND_port = SwitchInput[0];
+// static constexpr tSwitchInput *P1_input = SwitchInput + 2;
+
+static constexpr uint8_t ControlLines[2][3] = {
+    {D2, D1, D0}, {D7, D6, D5}}; // numbers of NodeMCU IO ports
+
+static bool RunSampling = true;
+
+static_assert(N_ELEMENTS(SwitchInput) == NUM_Inputs, "Just checking!");
 
 // integration data
 static struct Integrals_ {
   float Power, Voltage, Current;
-} Integrals[NUM_P1_PORTS]; // two alterrnating buffers
+} Integrals[NUM_Inputs]; // two alterrnating buffers
 
 static struct Integrals_ VoltageSqr, GND_integ;
 
@@ -59,7 +81,7 @@ static void Set74HC4051_code(uint8_t c, uint8_t IC_num) {
     digitalWrite(ControlLines[IC_num][BitI], (c >> BitI) & 1);
 } // Set74HC4051_code
 
-static void ConnectP1_Port(tP1_Pin n) {
+static void ConnectInput(tSwitchInput n) {
   Set74HC4051_code(n.PortNum, n.IC_num);
   Set74HC4051_code(OpenPort[1 - n.IC_num], 1 - n.IC_num);
   delayMicroseconds(Delay);
@@ -75,15 +97,20 @@ static void start_sampling() {
 } // start_sampling
 
 static void sample_all_ports() {
-  for (uint8_t PortI = 0; PortI < NUM_P1_PORTS; ++PortI) {
-    uint32_t Voltage, Current;
-    ConnectP1_Port(P1_Port[PortI]);
+  ConnectInput(VoltagePort);
+  uint32_t MidVoltage, Voltage = analogRead(ANALOG_PIN);
+  for (uint8_t PortI = 0; PortI < NUM_Inputs; ++PortI) {
+    uint32_t Current;
+    ConnectInput(SwitchInput[PortI]);
     Current = analogRead(ANALOG_PIN);
-    ConnectP1_Port(VoltagePort);
+    ConnectInput(VoltagePort);
+    // to compensate for phase shift let's average voltage
+    MidVoltage = Voltage;
     Voltage = analogRead(ANALOG_PIN);
+    MidVoltage = (MidVoltage + Voltage) / 2;
 
-    Integrals[PortI].Power += Voltage * Current;
-    Integrals[PortI].Voltage += Voltage;
+    Integrals[PortI].Power += MidVoltage * Current;
+    Integrals[PortI].Voltage += MidVoltage;
     Integrals[PortI].Current += Current;
   }
   SampleCount++;
@@ -116,7 +143,7 @@ void initHardware() {
   Serial.begin(115200);
   Serial.println();
 
-  for(uint8_t PinI=0; PinI < N_ELEMENTS(ControlLines); PinI++)
+  for (uint8_t PinI = 0; PinI < 6; PinI++)
     pinMode(ControlLines[0][PinI], OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, 0);
@@ -237,12 +264,25 @@ static void sample_waveform() {
   }
 } // sample_waveform
 
+static String samples2string(uint8_t FirstPort) {
+  String s;
+  for (uint8_t p = FirstPort; p < NUM_Inputs; p++) {
+    Integrals_ *pInt = &Integrals[p];
+    float Pwr = (pInt->Power - pInt->Current * pInt->Voltage / SampleCount) /
+                SampleCount * WattsInUnit;
+    s += String(Pwr) + "<br>";
+    pInt->Power = pInt->Current = pInt->Voltage = 0;
+  }
+  SampleCount = 0;
+  return(s);
+} // samples2string
+
 void loop() {
   if (client) {
     if (WF_sampling_count)
       sample_waveform();
   } else {
-    if (is_past(NewSample)) { // delay is over
+    if (RunSampling && is_past(NewSample)) { // delay is over
       sample_all_ports();
       NewSample = micros() + WF_SAMPLE_INTERVAL * 10;
     }
@@ -261,29 +301,23 @@ void loop() {
       // parse request
       int Port;
 
-      if (req.lastIndexOf("/sample") != -1) {
+      if (req.lastIndexOf("/read") != -1) {
+        reply(samples2string(FirstP1input));
+      } else if (req.lastIndexOf("/sample") != -1) {
         float SamplingTime = millis() - SamplingStarted;
         String s(String(SamplingTime / SampleCount) + " ms per sample over " +
                  String(SamplingTime) +
                  " ms<br>----------------------------------<br>");
-        for (uint8_t p = 0; p < NUM_P1_PORTS; p++) {
-          Integrals_ *pInt = &Integrals[p];
-          float Pwr =
-              (pInt->Power - pInt->Current * pInt->Voltage / SampleCount) /
-              SampleCount;
-          s += String(Pwr) + "<br>";
-          pInt->Power = pInt->Current = pInt->Voltage = 0;
-        }
-        reply(s);
-        SampleCount = 0;
+        s += samples2string(0);
         SamplingStarted = millis();
+        reply(s);
       } else if ((Port = req.lastIndexOf("/port")) != -1) {
         // let's read port number
         Port = (req.charAt(Port + strlen("/port/")) - '0');
         if (Port < 0 || Port > 7) {
           reply(String(F("Wrong port number! <br>")));
         } else {
-          ConnectP1_Port(P1_Port[Port]);
+          ConnectInput(SwitchInput[Port]);
           String s("Port  =");
           s += String(Port) + ", " + String(analogRead(ANALOG_PIN));
           reply(s);
@@ -293,21 +327,36 @@ void loop() {
         if (Port < 0 || Port > 7) {
           reply(String(F("Wrong port number! <br>")));
         } else {
-          ConnectP1_Port(P1_Port[Port]);
+          ConnectInput(SwitchInput[Port]);
           WF_sampling_count = SAMPLES_IN_WF;
         }
       } else if ((Port = req.lastIndexOf("/delay")) != -1) {
         Delay = GetDelay(req.charAt(Port + strlen("/delay/")) - '0');
         reply(String(F("Delay is set to ")) + String(Delay) +
               " microseconds.<br>");
-      } else if ((Port = req.lastIndexOf("/test")) != -1) {
-        Port = (req.charAt(Port + strlen("/test/")) - '0');
-        uint32_t Start = micros();
-        for (uint16_t n = 10000; n; --n) {
-          analogRead(ANALOG_PIN);
+      } else if ((Port = req.lastIndexOf("/ctrl")) != -1) {
+        Port = (req.charAt(Port + strlen("/ctrl/")) - '0');
+        switch (Port) {
+        case 2: {
+          uint32_t Start = micros();
+          for (uint16_t n = 10000; n; --n) {
+            analogRead(ANALOG_PIN);
+          }
+          reply(String(F("10000 loops over ")) + String(micros() - Start) +
+                " us");
+          break;
         }
-        reply(String(F("10000 loops over ")) + String(micros() - Start) +
-              " us");
+        case 0:
+        case 1:
+          RunSampling = Port;
+          reply(String(F("Continuos sampling turned ")) +
+                String(Port ? "off" : "on"));
+          NewSample = micros();
+          break;
+        default:
+          reply(String(F("Unknown control command!")));
+          break;
+        }
       } else if ((Port = req.lastIndexOf("/wifi")) != -1) {
         String IDs = req.substring(Port + strlen("/wifi/"));
         int Colon = IDs.indexOf(':');
@@ -322,8 +371,9 @@ void loop() {
         EEPROM.end();
         reply(String(F("WIFI is set to ")) + SSID + ":" + Pass + "<br>");
       } else
-        reply(String(F("Invalid Request.<br> Try /sample or /port/? or /wave/? "
-                       "or /wifi/ssid:password.")));
+        reply(String(
+            F("Invalid Request.<br> Try /read or /sample or /port/? or /wave/? "
+              "or /ctrl/? or /wifi/ssid:password.")));
     }
   }
 } // loop
