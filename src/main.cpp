@@ -30,18 +30,33 @@ static constexpr struct tSwitchInput {
 
 static constexpr uint8_t FirstP1input = 2;
 
-// Calibration - for voltage Pin readout is 104000 for 125V input.
-static constexpr float VoltageDivider = 12.85 / 1.89; // input R1/R2 divider
-// Units output for voltage are (Vac/VoltageDivider)^2/GeneralScaler, so
-static constexpr float GeneralScaler =
-    avp::sqr(125. / VoltageDivider) / 104000UL;
-static constexpr float SCT013_coeff = 20.; // 20A are converted to 1V
-// for the P1 pins Power = Vac*Iac = Vac*Vpin*SCT013_coeff. The units are
-// Vac/VoltageDivider*Vpin/GeneralScaler =
-// Power/SCT013_coeff/VoltageDivider/GeneralScaler;
-// so
-static constexpr float WattsInUnit =
-    VoltageDivider * SCT013_coeff * GeneralScaler;
+// Calibration is done using "Kill-A-Watt" with 0, 300, 750 and 1000 loads
+// Calibration data:
+#if 0
+[[-432 0 -444 0 -421 0  6451 313  6467 312  6440 310 22160 1010 22060 1013 22060 1011 15880 731 15828 732 15827 732],...
+[16048 732 16108 731 16111 730 22450 1016 22424 1022 22390 1014 6727 311 6701 311 6705 310 -143 0 -172 0 -191 0],...
+[127 0 130 0 85 0 7213 310 7006 308 6979 307 22535 1000 22336 1010 22387 1001 16059 721 16210 723 16153 722],...
+[16344 725 16693 724 16614 723 23021 1000 22931 999 22872 999 7345 308 7290 307 7320 306 370 0 435 0 431 0],...
+[650 0 738 0 700 0 -6225 307 -6128 305 -6164 305 -21527 999 -21599 1000 -21632 1009 -15881 721 -15454 722 -15436 721],...
+[17056 721 17129 723 17194 724 23374 998 23480 1000 23505 1000 7827 306 7847 306 7789 306 1291 0 984 0 990 0],...
+[1409 0 1169 0 1205 0 8305 309 8116 307 8167 306 23533 997 23734 1008 23709 996 17815 720 17469 718 17487 722],...
+[17793 720 17596 720 17616 721 24120 1003 23940 1001 23910 1001 8206 307 8248 306 8265 307 1267 0 1293 0 1333 0],...
+[1426 0 1331 0 1329 0 8370 307 8247 307 8317 307 23936 999 23897 998 23923 999 17439 719 17609 721 17535 719],...
+[-15180 718 -15266 719 -15236 719 -21330 997 -21598 996 -21622 994 -5591 307 -5765 306 -5795 308 1207 0 1220 0 1193 0],...
+[1028 0 992 0 1034 0 -5955 307 -5949 306 -5968 306 -21911 999 -21724 996 -21725 998 -15592 731 -15637 729 -15652 728],...
+[-15740 729 -15767 729 -15817 723 -22108 1004 -21943 1004 -21983 998 -6113 308 -6208 307 -6207 307 1164 0 706 0 783 0]]
+#endif
+
+// Power is linearly  proportional to the corresponding "sample" output with
+// coeffients
+static constexpr float CalCoeff[][2] = {
+    {20.543, 0.044872},  {7.875, 0.045003},   {-6.9238, 0.045074},
+    {-17.445, 0.044473}, {29.171, -0.04485},  {-46.005, 0.044697},
+    {-57.662, 0.044537}, {-57.244, 0.044098}, {-60.402, 0.044346},
+    {54.271, -0.043735}, {45.115, -0.043748}, {37.943, -0.043748},
+};
+
+; // units = Power*CalCoeffs[1] + CalCoeffs[2]
 
 static constexpr tSwitchInput VoltagePort = SwitchInput[1];
 static constexpr uint8_t OpenPort[2] = {2, 1};
@@ -264,17 +279,19 @@ static void sample_waveform() {
   }
 } // sample_waveform
 
-static String samples2string(uint8_t FirstPort) {
+static String samples2string(uint8_t FirstPort, bool Calibrate) {
   String s;
   for (uint8_t p = FirstPort; p < NUM_Inputs; p++) {
     Integrals_ *pInt = &Integrals[p];
     float Pwr = (pInt->Power - pInt->Current * pInt->Voltage / SampleCount) /
-                SampleCount * WattsInUnit;
+                SampleCount;
+    if (Calibrate)
+      Pwr = Pwr*CalCoeff[p-FirstPort][1] + CalCoeff[p-FirstPort][0];
     s += String(Pwr) + "<br>";
     pInt->Power = pInt->Current = pInt->Voltage = 0;
   }
   SampleCount = 0;
-  return(s);
+  return (s);
 } // samples2string
 
 void loop() {
@@ -302,13 +319,13 @@ void loop() {
       int Port;
 
       if (req.lastIndexOf("/read") != -1) {
-        reply(samples2string(FirstP1input));
+        reply(samples2string(FirstP1input, true));
       } else if (req.lastIndexOf("/sample") != -1) {
         float SamplingTime = millis() - SamplingStarted;
         String s(String(SamplingTime / SampleCount) + " ms per sample over " +
                  String(SamplingTime) +
                  " ms<br>----------------------------------<br>");
-        s += samples2string(0);
+        s += samples2string(0, false);
         SamplingStarted = millis();
         reply(s);
       } else if ((Port = req.lastIndexOf("/port")) != -1) {
