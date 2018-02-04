@@ -28,14 +28,13 @@ static constexpr struct tSwitchInput {
      {4, 1}, {6, 1}, {7, 1}, {0, 1}, {5, 1}, {3, 1}, // connected to P1
      {4, 0}, {6, 0}, {0, 0}, {1, 0}, {7, 0}, {5, 0}};
 
-static constexpr uint8_t FirstP1input = 2;
+static constexpr uint8_t FirstP1input = 2; // this and rest of SwitchInput are connected to P1 pins
+static constexpr float CalibCoeff = 22.;
 
-// Calibration is done using "Kill-A-Watt" with 0, 300, 750 and 1000 loads
-
-static constexpr tSwitchInput VoltagePort = SwitchInput[1];
-static constexpr uint8_t OpenPort[2] = {2, 1};
-static constexpr tSwitchInput GND_port = SwitchInput[0];
-// static constexpr tSwitchInput *P1_input = SwitchInput + 2;
+static constexpr tSwitchInput VoltagePort = SwitchInput[1]; // input connected to Voltage pickup
+static constexpr uint8_t OpenPort[2] = {2, 1}; // open inputs for 1 and 2 chip
+static constexpr uint8_t GND_PortI = 0; // input connected to ground
+static constexpr tSwitchInput GND_port = SwitchInput[GND_PortI];
 
 static constexpr uint8_t ControlLines[2][3] = {
     {D2, D1, D0}, {D7, D6, D5}}; // numbers of NodeMCU IO ports
@@ -63,7 +62,8 @@ static void Set74HC4051_code(uint8_t c, uint8_t IC_num) {
 static void ConnectInput(tSwitchInput n) {
   Set74HC4051_code(n.PortNum, n.IC_num);
   Set74HC4051_code(OpenPort[1 - n.IC_num], 1 - n.IC_num);
-  NewSample = micros() + Delay;
+  delayMicroseconds(Delay);
+  yield();
 }
 
 static inline bool is_past(uint32_t time_us) {
@@ -74,43 +74,38 @@ static uint32_t ScanTime; // ms
 static float Power[NUM_Inputs];
 // integration data
 static struct { float Power, Voltage, Current; } Integral;
-static uint8_t NumSamplesPerPort = 200, SampleCount;
+static uint8_t NumSamplesPerPort = 200;
 static uint32_t NumScans;
 
 static void sample_port() {
   static uint8_t CurPort = 0;
   static uint32_t Current;
   static uint16_t LastVoltage;
-  static bool DoVoltage = true;
   static uint32_t ScanStartedMark = millis();
 
-  if (DoVoltage) {
+  ScanStartedMark = millis();
+  ConnectInput(VoltagePort);
+  LastVoltage = analogRead(ANALOG_PIN);
+  for(uint8_t SamplI=0; SamplI < NumSamplesPerPort; SamplI++) {
+    ConnectInput(SwitchInput[CurPort]);
+    Current = analogRead(ANALOG_PIN);
+    ConnectInput(VoltagePort);
     uint16_t Voltage = analogRead(ANALOG_PIN);
     LastVoltage = (LastVoltage + Voltage) / 2;
     Integral.Power += LastVoltage * Current;
     Integral.Voltage += LastVoltage;
     Integral.Current += Current;
     LastVoltage = Voltage;
-    if (++SampleCount == NumSamplesPerPort) {
-      Power[CurPort] =
-          (Integral.Power - Integral.Current * Integral.Voltage / SampleCount) /
-          SampleCount;
+  }
+  Power[CurPort] =
+      (Integral.Power - Integral.Current * Integral.Voltage / NumSamplesPerPort) /
+      NumSamplesPerPort;
 
-      Integral.Power = Integral.Current = Integral.Voltage = 0.;
-      SampleCount = 0;
-      if (++CurPort == NUM_Inputs) {
-        CurPort = 0;
-        ++NumScans;
-        ScanTime = millis() - ScanStartedMark;
-        ScanStartedMark = millis();
-      }
-    }
-    ConnectInput(SwitchInput[CurPort]);
-    DoVoltage = false;
-  } else {
-    Current = analogRead(ANALOG_PIN);
-    ConnectInput(VoltagePort);
-    DoVoltage = true;
+  Integral.Power = Integral.Current = Integral.Voltage = 0.;
+  if (++CurPort == NUM_Inputs) {
+    CurPort = 0;
+    ++NumScans;
+    ScanTime = millis() - ScanStartedMark;
   }
 } // sample_port
 
@@ -233,10 +228,11 @@ static WiFiClient client;
 
 static void reply(const String &message) {
   String s(F("HTTP/1.1 200 OK\r\n"
-             "Content-Type: text/html\r\n\r\n"
+             "Content-Type: text/html\r\n"
+             "Refresh: 5\r\n\r\n" // refresh the page automatically every 5 sec
              "<!DOCTYPE HTML>\r\n<html>\r\n"));
   s += message;
-  s += "</html>\n";
+  s += "</html>\r\n";
   client.print(s);
   delay(1);
   Serial.println("Client disconnected.");
@@ -265,24 +261,22 @@ static void sample_waveform() {
 static String samples2string(uint8_t FirstPort, bool Calibrate) {
   String s;
   for (uint8_t p = FirstPort; p < NUM_Inputs; p++)
-    s += String(Power[p]) + "<br>";
+    s += String(Calibrate?(Power[p]-Power[GND_PortI])/CalibCoeff:Power[p]) + "<br>";
   return (s);
 } // samples2string
 
 void loop() {
-  delay(2);
   if (client) {
     if (WF_sampling_count)
       sample_waveform();
   } else {
-    if (RunSampling && is_past(NewSample)) { // delay is over
-      sample_port();
-    }
+    delay(10);
+    if (RunSampling) sample_port();
 
     // Check if a client has connected
     client = server.available();
     if (client) {
-      uint8_t LEDstate = 1;
+      static uint8_t LEDstate = 1;
       digitalWrite(LED_PIN, LEDstate = 1 - LEDstate);
 
       // Read the first line of the request
@@ -293,7 +287,12 @@ void loop() {
       // parse request
       int Port;
 
-      if (req.lastIndexOf("/read") != -1) {
+      if (req.lastIndexOf("/get") != -1) {
+        client.print(samples2string(FirstP1input, true) + "\n");
+        delay(1);
+        client.stop();
+        Serial.println("Client disconnected.");
+      } else if (req.lastIndexOf("/read") != -1) {
         reply(samples2string(FirstP1input, true));
       } else if (req.lastIndexOf("/sample") != -1) {
         String s("Scan N: " + String(NumScans) + ", Time: " + String(ScanTime) +
