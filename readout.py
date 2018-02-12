@@ -18,7 +18,8 @@ while True:
   close_ss = '<br></html>'
   t = t[t.find(open_ss) ++ len(open_ss):t.find(close_ss)]
   t = t.replace('<br>',',')
-  with open('f:\\file.txt', 'a') as file:
+  print(t)
+  with open('/RAIDZ2/R/PowerMon1.txt', 'a') as file:
     file.write(str(time.time()) + ',' + t + '\n')
   time.sleep(5)
   
