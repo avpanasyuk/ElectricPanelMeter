@@ -9,9 +9,10 @@ import requests
 import time
 
 while True:
+  time.sleep(5)
   try:
     response = requests.get('http://192.168.2.169/read')
-  except ConnectionError:
+  except requests.exceptions.ConnectionError:
     continue
   t = response.text
   open_ss = '<html>\r\n'
@@ -20,7 +21,5 @@ while True:
   t = t.replace('<br>',',')
   print(t)
   with open('/RAIDZ2/R/PowerMon1.txt', 'a') as file:
-    file.write(str(time.time()) + ',' + t + '\n')
-  time.sleep(5)
-  
+    file.write(str(time.time()) + ',' + t + '\n') 
   
