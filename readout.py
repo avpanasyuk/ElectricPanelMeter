@@ -8,11 +8,18 @@ Created on Sat Feb  3 16:33:52 2018
 import requests
 import time
 
+comerri = 0
+
 while True:
   time.sleep(5)
   try:
     response = requests.get('http://192.168.2.169/read')
-  except requests.exceptions.ConnectionError:
+  except (requests.exceptions.ConnectionError, 
+          requests.exceptions.ReadTimeout, 
+          urllib3.exceptions.ReadTimeoutError,
+          TimeoutError):
+    print('Communication problem #' + str(comerri) + '\n')
+    comerri = comerri + 1
     continue
   t = response.text
   open_ss = '<html>\r\n'
