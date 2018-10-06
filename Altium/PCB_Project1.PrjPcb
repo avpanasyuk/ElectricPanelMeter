@@ -56,7 +56,7 @@ GenerateClassCluster=0
 DocumentUniqueId=NEDGAPYU
 
 [Document2]
-DocumentPath=Sheet1a.SchDoc
+DocumentPath=Sheet1_1.SchDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
 AnnotationIndexControlEnabled=0
@@ -73,7 +73,7 @@ GenerateClassCluster=0
 DocumentUniqueId=PMXBYSPH
 
 [Document3]
-DocumentPath=PCB1a.PcbDoc
+DocumentPath=PCB1_1.PcbDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
 AnnotationIndexControlEnabled=0
