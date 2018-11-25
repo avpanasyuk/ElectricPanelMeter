@@ -31,6 +31,6 @@ with requests.Session() as s:
         break
     else:
       print(t)
-      with open('/RAIDZ2/R/PowerMon2.csv', 'a') as file:
+      with open('/RAIDZ2/R/test.csv', 'a') as file:
         file.write(str(time.time()) + ',' + t + '\n') 
       
