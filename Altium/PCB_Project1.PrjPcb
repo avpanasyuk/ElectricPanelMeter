@@ -56,7 +56,7 @@ GenerateClassCluster=0
 DocumentUniqueId=NEDGAPYU
 
 [Document2]
-DocumentPath=Sheet1a.SchDoc
+DocumentPath=Sheet1_1.SchDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
 AnnotationIndexControlEnabled=0
@@ -73,7 +73,7 @@ GenerateClassCluster=0
 DocumentUniqueId=PMXBYSPH
 
 [Document3]
-DocumentPath=PCB1a.PcbDoc
+DocumentPath=PCB1_1.PcbDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
 AnnotationIndexControlEnabled=0
@@ -104,23 +104,6 @@ ClassGenCCAutoRoomEnabled=1
 ClassGenNCAutoScope=None
 DItemRevisionGUID=
 GenerateClassCluster=0
-DocumentUniqueId=WVJTLDRF
-
-[Document5]
-DocumentPath=PCB_Project_A.IntLib
-AnnotationEnabled=1
-AnnotateStartValue=1
-AnnotationIndexControlEnabled=0
-AnnotateSuffix=
-AnnotateScope=All
-AnnotateOrder=-1
-DoLibraryUpdate=1
-DoDatabaseUpdate=1
-ClassGenCCAutoEnabled=1
-ClassGenCCAutoRoomEnabled=1
-ClassGenNCAutoScope=None
-DItemRevisionGUID=
-GenerateClassCluster=0
 DocumentUniqueId=
 
 [GeneratedDocument1]
@@ -128,95 +111,87 @@ DocumentPath=Project Outputs for PCB_Project\Design Rule Check - PCB1.html
 DItemRevisionGUID=
 
 [GeneratedDocument2]
-DocumentPath=Project Outputs for PCB_Project_A\Design Rule Check - PCB1a.html
-DItemRevisionGUID=
-
-[GeneratedDocument3]
 DocumentPath=Project Outputs for PCB_Project\PCB1.1
 DItemRevisionGUID=
 
-[GeneratedDocument4]
+[GeneratedDocument3]
 DocumentPath=Project Outputs for PCB_Project\PCB1.DRR
 DItemRevisionGUID=
 
-[GeneratedDocument5]
+[GeneratedDocument4]
 DocumentPath=Project Outputs for PCB_Project\PCB1.EXTREP
 DItemRevisionGUID=
 
-[GeneratedDocument6]
+[GeneratedDocument5]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GBL
 DItemRevisionGUID=
 
-[GeneratedDocument7]
+[GeneratedDocument6]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GBO
 DItemRevisionGUID=
 
-[GeneratedDocument8]
+[GeneratedDocument7]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GBP
 DItemRevisionGUID=
 
-[GeneratedDocument9]
+[GeneratedDocument8]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GBS
 DItemRevisionGUID=
 
-[GeneratedDocument10]
+[GeneratedDocument9]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GKO
 DItemRevisionGUID=
 
-[GeneratedDocument11]
+[GeneratedDocument10]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GM1
 DItemRevisionGUID=
 
-[GeneratedDocument12]
+[GeneratedDocument11]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GM2
 DItemRevisionGUID=
 
-[GeneratedDocument13]
+[GeneratedDocument12]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GM13
 DItemRevisionGUID=
 
-[GeneratedDocument14]
+[GeneratedDocument13]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GM15
 DItemRevisionGUID=
 
-[GeneratedDocument15]
+[GeneratedDocument14]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GML
 DItemRevisionGUID=
 
-[GeneratedDocument16]
+[GeneratedDocument15]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GTL
 DItemRevisionGUID=
 
-[GeneratedDocument17]
+[GeneratedDocument16]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GTO
 DItemRevisionGUID=
 
-[GeneratedDocument18]
+[GeneratedDocument17]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GTP
 DItemRevisionGUID=
 
-[GeneratedDocument19]
+[GeneratedDocument18]
 DocumentPath=Project Outputs for PCB_Project\PCB1.GTS
 DItemRevisionGUID=
 
-[GeneratedDocument20]
+[GeneratedDocument19]
 DocumentPath=Project Outputs for PCB_Project\PCB1.LDP
 DItemRevisionGUID=
 
-[GeneratedDocument21]
+[GeneratedDocument20]
 DocumentPath=Project Outputs for PCB_Project\PCB1.REP
 DItemRevisionGUID=
 
-[GeneratedDocument22]
+[GeneratedDocument21]
 DocumentPath=Project Outputs for PCB_Project\PCB1.RUL
 DItemRevisionGUID=
 
-[GeneratedDocument23]
+[GeneratedDocument22]
 DocumentPath=Project Outputs for PCB_Project\PCB1.TXT
-DItemRevisionGUID=
-
-[GeneratedDocument24]
-DocumentPath=Project Outputs for PCB_Project_A\Sheet1a.REP
 DItemRevisionGUID=
 
 [Configuration1]
@@ -493,38 +468,36 @@ Configuration12_Item1=AddToAllLayerClasses.Set= |AddToAllPlots.Set=SerializeLaye
 [OutputGroup6]
 Name=Report Outputs
 Description=
-TargetPrinter=dell E525w
+TargetPrinter=Samsung ML-2950
 PrinterOptions=Record=PrinterOptions|Copies=1|Duplex=1|TrueTypeOptions=3|Collate=1|PrintJobKind=1|PrintWhat=1
-OutputType1=Script
-OutputName1=Script Output
+OutputType1=BOM_PartType
+OutputName1=Bill of Materials
 OutputDocumentPath1=
 OutputVariantName1=[No Variations]
 OutputDefault1=0
-OutputType2=SimpleBOM
-OutputName2=Simple BOM
+PageOptions1=Record=PageOptions|CenterHorizontal=True|CenterVertical=True|PrintScale=1.00|XCorrection=1.00|YCorrection=1.00|PrintKind=1|BorderSize=5000000|LeftOffset=0|BottomOffset=0|Orientation=2|PaperLength=1000|PaperWidth=1000|Scale=100|PaperSource=7|PrintQuality=-3|MediaType=1|DitherType=10|PrintScaleMode=1|PaperKind=Letter|PaperIndex=1
+OutputType2=ComponentCrossReference
+OutputName2=Component Cross Reference Report
 OutputDocumentPath2=
 OutputVariantName2=[No Variations]
 OutputDefault2=0
-OutputType3=SinglePinNetReporter
-OutputName3=Report Single Pin Nets
+OutputType3=ReportHierarchy
+OutputName3=Report Project Hierarchy
 OutputDocumentPath3=
 OutputVariantName3=[No Variations]
 OutputDefault3=0
-Configuration3_Name1=OutputConfigurationParameter1
-Configuration3_Item1=NetlistVersion=0|Record=SinglePinNetsView
-OutputType4=BOM_PartType
-OutputName4=Bill of Materials
+OutputType4=Script
+OutputName4=Script Output
 OutputDocumentPath4=
 OutputVariantName4=[No Variations]
 OutputDefault4=0
-PageOptions4=Record=PageOptions|CenterHorizontal=True|CenterVertical=True|PrintScale=1.00|XCorrection=1.00|YCorrection=1.00|PrintKind=1|BorderSize=5000000|LeftOffset=0|BottomOffset=0|Orientation=2|PaperLength=1000|PaperWidth=1000|Scale=100|PaperSource=7|PrintQuality=-3|MediaType=1|DitherType=10|PrintScaleMode=1|PaperKind=Letter|PaperIndex=1
-OutputType5=ComponentCrossReference
-OutputName5=Component Cross Reference Report
+OutputType5=SimpleBOM
+OutputName5=Simple BOM
 OutputDocumentPath5=
 OutputVariantName5=[No Variations]
 OutputDefault5=0
-OutputType6=ReportHierarchy
-OutputName6=Report Project Hierarchy
+OutputType6=SinglePinNetReporter
+OutputName6=Report Single Pin Nets
 OutputDocumentPath6=
 OutputVariantName6=[No Variations]
 OutputDefault6=0
@@ -1079,7 +1052,7 @@ UpdateVariants=1
 PartTypes=0
 
 [Comparison Options]
-ComparisonOptions0=Kind=Net|MinPercent=75|MinMatch=3|ShowMatch=0|Confirm=0|UseName=-1|InclAllRules=0
+ComparisonOptions0=Kind=Net|MinPercent=75|MinMatch=3|ShowMatch=-1|Confirm=-1|UseName=-1|InclAllRules=0
 ComparisonOptions1=Kind=Net Class|MinPercent=75|MinMatch=3|ShowMatch=-1|Confirm=-1|UseName=-1|InclAllRules=0
 ComparisonOptions2=Kind=Component Class|MinPercent=75|MinMatch=3|ShowMatch=-1|Confirm=-1|UseName=-1|InclAllRules=0
 ComparisonOptions3=Kind=Rule|MinPercent=75|MinMatch=3|ShowMatch=-1|Confirm=-1|UseName=-1|InclAllRules=0
