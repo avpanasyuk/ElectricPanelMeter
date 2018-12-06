@@ -1,4 +1,4 @@
-#include <Arduino.h>
+                                                                                                                                                                                                                                                                                                                                                                                                          #include <Arduino.h>
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
 #include <General/Macros.h>
@@ -21,19 +21,21 @@ constexpr uint8_t NUM_I_ports = 14;
 // static constexpr float CalibCoeff = 22.; // that's for calibration with heaters
 
 // FIXME what is the "theoretical" value?
-// transformer under load 122.4/12.52
-// divider J1 to ADC = 0.025, divider outlet to ADC = 2.56e-3
-// divider current to ADC = 0.16824
-// ADC 1024 units to 1V, so there is 2.62 adc units for 1 outlet V, and
-// 172.3 unit per 1V Vcurrent
-// with SCT013 20A/1V scale, it is 8.61 ADC units per outlet A.
-// so, taken together it is 8.61*2.62 = 22.6. We do not need to convert
+// transformer under load 121.8/12.89
+// divider J1 to ADC = 0.0242, divider outlet to ADC = 2.56e-3
+// divider current to ADC = 0.165
+// ADC 1024 units to 1V, so there is 1024*0.00256=2.62 adc units for 1 outlet V, and
+// 1024*0.165=169 unit per 1V Vcurrent
+// so, convertion coefficient for Vcurrent*Vvoltage is
+static constexpr float CalibCoeff = 169.0*2.62;
+// We will have to multiply it by A to V ratio of the sensing transformers in MATLAB
+// We do not need to convert
 // amplitude to RMS, happens automatically during integration
-static constexpr float CalibCoeff = 22.6;
 
 
 static constexpr uint8_t NumCtrlLines_74HC4051 = 3;
-static constexpr uint8_t ControlLines[2][NumCtrlLines_74HC4051] = {
+static constexpr uint8_t Num74HC4051 = 2;
+static constexpr uint8_t ControlLines[Num74HC4051][NumCtrlLines_74HC4051] = {
     {D2, D1, D0}, {D5, D7, D6}}; // numbers of NodeMCU IO ports
 static constexpr uint8_t Disable74HC4051_port[] = {D3, D4};
 
@@ -88,7 +90,6 @@ static void sample_port() {
   static uint16_t Current;
   static uint32_t Voltage; // it is 32-bit to avoid overflow on multiplication
   static uint32_t ScanStartedMark;
-  static float GND_Pwr = 0;
 
   ScanStartedMark = millis();
   ConnectV_Port();
@@ -106,7 +107,9 @@ static void sample_port() {
     Integral.Current += Current;
   }
 
+#if 0
   // let's evaluate noise on GND line
+  static float GND_Pwr = 0;
   ConnectGND_Port();
   uint16_t GND_I = analogRead(ANALOG_PIN);
   ConnectV_Port();
@@ -116,8 +119,12 @@ static void sample_port() {
   Power[CurPort] = (Integral.Power -
                     Integral.Current * Integral.Voltage / NumSamplesPerPort) /
                    NumSamplesPerPort - GND_Pwr; // subtracting noise
-
   if(Power[CurPort] < 0) Power[CurPort] = 0;
+#else
+Power[CurPort] = (Integral.Power -
+                  Integral.Current * Integral.Voltage / NumSamplesPerPort) /
+                 NumSamplesPerPort; // subtracting noise
+#endif
 
   Integral.Power = Integral.Current = Integral.Voltage = 0.;
   if (++CurPort == NUM_I_ports) {
@@ -144,7 +151,7 @@ void setupWiFi() {
   char AP_NameChar[AP_NameString.length() + 1];
   memset(AP_NameChar, 0, AP_NameString.length() + 1);
 
-  for (int i = 0; i < AP_NameString.length(); i++)
+  for (uint8_t i = 0; i < AP_NameString.length(); i++)
     AP_NameChar[i] = AP_NameString.charAt(i);
 
   WiFi.softAP(AP_NameChar, WiFiAPPSK);
@@ -154,17 +161,19 @@ void initHardware() {
   Serial.begin(115200);
   Serial.println();
 
-  for (uint8_t PinI = 0; PinI < 6; PinI++)
-    pinMode(ControlLines[0][PinI], OUTPUT);
+for(uint8_t SwitchI=0; SwitchI < Num74HC4051; ++SwitchI) {
+  for (uint8_t PinI = 0; PinI < NumCtrlLines_74HC4051; PinI++)
+    pinMode(ControlLines[SwitchI][PinI], OUTPUT);
+      pinMode(Disable74HC4051_port[SwitchI], OUTPUT);
+}
+
   pinMode(LED_PIN, OUTPUT);
-  pinMode(Disable74HC4051_port[0], OUTPUT);
-  pinMode(Disable74HC4051_port[1], OUTPUT);
   digitalWrite(LED_PIN, 0);
 } // initHardware
 
 int debug_vprintf(const char *format, va_list a) {
   static constexpr uint8_t BUFFER_SIZE = 255;
-  static char Buffer[BUFFER_SIZE];
+  static char Buffer[BUFFER_SIZE+1];
   Serial.println(vsnprintf(Buffer, BUFFER_SIZE, format, a));
   return 1;
 } // debug_vprintf
@@ -249,17 +258,22 @@ static WiFiClient client;
 static void reply_and_stop(const String &message) {
   String s(F("HTTP/1.1 200 OK\r\n"
              "Content-Type: text/html\r\n"
+             "Connection: close\r\n" // the connection will be closed after completion of the response
              "Refresh: 5\r\n\r\n" // refresh the page automatically every 5 sec
              "<!DOCTYPE HTML>\r\n<html>\r\n"));
   s += message;
-  s += "</html>\r\n";
-  client.print(s);
+  s += "<br>\r\n</html>";
+  client.println(s);
+  // client.flush();
   delay(1);
-  Serial.println("Client disconnected.");
+  #ifdef DEBUG
+    Serial.println("Sent:" + message);
+    Serial.println("Client disconnected.");
+  #endif
   client.stop();
 } // reply_and_stop
 
-static uint16_t WF_sampling_count;
+static uint16_t WF_sampling_count = 0;
 
 static void sample_waveform() {
   static uint16_t Waveform[SAMPLES_IN_WF];
@@ -289,9 +303,12 @@ void loop() {
   if (client) { // client did not disconnect in previuos loop, it means that we
     // are sampling WF, at most one sample per loop
     if (WF_sampling_count) sample_waveform();
+  #ifdef DEBUG
+     // Serial.print("x");
+  #endif
   } else { // we are not sampling WF
     delay(10);
-    if (RunSampling) sample_port();
+    if(RunSampling) sample_port();
 
     // Check if a client has a Request
     client = server.available();
@@ -301,18 +318,13 @@ void loop() {
 
       // Read the first line of the request
       String req = client.readStringUntil('\r');
-      Serial.println(req);
+      Serial.println("Received: " + req);
       client.flush();
 
       // parse request
       int Port;
 
-      if (req.lastIndexOf("/get") != -1) {
-        client.print(samples2string(true) + "\n");
-        delay(1);
-        client.stop();
-        Serial.println("Client disconnected.");
-      } else if (req.lastIndexOf("/read") != -1) {
+      if (req.lastIndexOf("/read") != -1) {
         reply_and_stop(samples2string(true));
       } else if (req.lastIndexOf("/sample") != -1) {
         String s("Scan N: " + String(NumScans) + ", Time: " + String(ScanTime) +
@@ -323,7 +335,7 @@ void loop() {
         // let's read port number
         Port = (req.charAt(Port + strlen("/port/")) - '0');
         if (Port < 0 || Port > 15) {
-          reply_and_stop(String(F("Wrong port number! <br>")));
+          reply_and_stop(String(F("Wrong port number!")));
         } else {
           if(Port == 0) ConnectV_Port(); else if(Port == 15) ConnectGND_Port();
           else ConnectI_Port(Port);
@@ -334,7 +346,7 @@ void loop() {
       } else if ((Port = req.lastIndexOf("/wave")) != -1) {
         Port = (req.charAt(Port + strlen("/wave/")) - '0');
         if (Port < 0 || Port > 15) {
-          reply_and_stop(String(F("Wrong port number! <br>")));
+          reply_and_stop(String(F("Wrong port number!")));
         } else {
           if(Port == 0) ConnectV_Port(); else if(Port == 15) ConnectGND_Port();
           else ConnectI_Port(Port);
@@ -343,7 +355,7 @@ void loop() {
       } else if ((Port = req.lastIndexOf("/delay")) != -1) {
         Delay = GetDelay(req.charAt(Port + strlen("/delay/")) - '0');
         reply_and_stop(String(F("Delay is set to ")) + String(Delay) +
-              " microseconds.<br>");
+              " microseconds.");
       } else if ((Port = req.lastIndexOf("/ctrl")) != -1) {
         Port = (req.charAt(Port + strlen("/ctrl/")) - '0');
         switch (Port) {
@@ -379,11 +391,11 @@ void loop() {
         AVP::EEPROM_::WriteString(Pass);
         // EEPROM.commit();
         EEPROM.end();
-        reply_and_stop(String(F("WIFI is set to ")) + SSID + ":" + Pass + "<br>");
+        reply_and_stop(String(F("WIFI is set to ")) + SSID + ":" + Pass);
       } else
         reply_and_stop(String(
             F("Invalid Request.<br> Try /read or /sample or /port/? or /wave/? "
               "or /ctrl/? or /wifi/ssid:password.")));
-    }
-  }
+    } // new client request
+  } // client was closed on previous loop
 } // loop
