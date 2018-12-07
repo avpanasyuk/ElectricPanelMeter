@@ -1,0 +1,29 @@
+// static constexpr float CalibCoeff = 22.; // that's for calibration with
+// heaters
+// FIXME what is the "theoretical" value?
+// transformer under load 121.8/12.89
+// divider J1 to ADC = 0.0242, divider outlet to ADC = 2.56e-3
+// divider current to ADC = 0.165
+// ADC 1024 units to 1V, so there is 1024*0.00256=2.62 adc units for 1 outlet V,
+// and
+// 1024*0.165=169 unit per 1V Vcurrent
+// so, convertion coefficient for Vcurrent*Vvoltage is
+// static constexpr float CalibCoeff = 169.0 * 2.62;
+// We will have to multiply it by A to V ratio of the sensing transformers in
+// MATLAB
+// We do not need to convert
+// amplitude to RMS, happens automatically during integration
+
+# mV/A   Name
+18.8	Main Red
+18.8	Main Black
+18.8 	Subpanel Red
+18.8 	Subpanel Black
+50	22 - heat exchanger new
+50	23 - Main A/C compressor
+50	24
+50	26
+50	Grounding strip
+50  28 Air handler attic
+50	38
+50	40

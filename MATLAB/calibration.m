@@ -1,3 +1,32 @@
+% in new calibration we do not apply calibration in firmware, we store it
+% in calibration file and apply it in MATLAB/show code
+% Now we can calibrate by the port 0 data which is Voltage*Voltage.
+% So, we have following voltage dividers:
+% switch to ADC - Rsw
+% outlet to switch - Rout
+% we can not get both from one measurement. We can get (Rsw*Rout)^2
+% What we need is Rvv = Rsw^2*Rout. So we need another measurement, say at 
+% U2-3. 
+%%  Measuring the board V2
+% Ok, we see outlet voltage=122.6 and U2-3 voltage=1.922. So, 
+Rout = 122.6/1.922
+% We have Power at port 0 = 91400 while outlet voltage=124. It means
+% (Rsw*Rout)^2 = 124^2/91400, so
+Rsw = 124/sqrt(91400)/Rout % = 0.00643
+% we should note that it is quite a bit off LTspice
+% value of 0.147/0.0242/1024 = 0.005932, which would produce even bigger
+% error
+
+% The coefficient we need
+Rvv = Rsw^2*Rout % 0.0026373
+
+% we have to multiply it by sensor ratio
+
+14000*Rvv*20 = 740. % Should be 780. hmm?
+
+
+
+%% OLD CALIBRATION
 c = [[-432 0 -444 0 -421 0  6451 313  6467 312  6440 310 22160 1010 22060 1013 22060 1011 15880 731 15828 732 15827 732];...
 [16048 732 16108 731 16111 730 22450 1016 22424 1022 22390 1014 6727 311 6701 311 6705 310 -143 0 -172 0 -191 0];...
 [127 0 130 0 85 0 7213 310 7006 308 6979 307 22535 1000 22336 1010 22387 1001 16059 721 16210 723 16153 722];...
