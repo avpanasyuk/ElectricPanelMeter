@@ -9,7 +9,8 @@
 % U2-3. 
 %%  Measuring the board V2
 % Ok, we see outlet voltage=122.6 and U2-3 voltage=1.922. So, 
-Rout = 122.6/1.922
+Rout = 122.6/1.922 % if we moasure 60Hz harmonic it makes voltage = 10^(5.23/20),
+% = 1.826, but it makes final error worse
 % We have Power at port 0 = 91400 while outlet voltage=124. It means
 % (Rsw*Rout)^2 = 124^2/91400, so
 Rsw = 124/sqrt(91400)/Rout % = 0.00643

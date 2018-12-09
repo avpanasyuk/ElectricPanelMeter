@@ -6,59 +6,20 @@
 #include <stdint.h>
 #include <stdio.h>
 
-//////////////////////
-// WiFi Definitions //
-//////////////////////
-const char WiFiAPPSK[] = "esp12345";
-
 /////////////////////
 // Pin Definitions //
 /////////////////////
-const int LED_PIN = 5;     // Thing's onboard, green LED
+const uint8_t LED_PIN = D8; // Thing's onboard, green LED
 const int ANALOG_PIN = A0; // The only analog pin on the Thing
 
-// hardware information about analog switched connections
-static constexpr uint8_t NUM_Inputs = 14;
-static constexpr struct tSwitchInput {
-  uint8_t PortNum;
-  uint8_t IC_num; //!< U2 -> 0, U3 -> 1
-} SwitchInput[] = //! ports are in order they are located on P1
-    {{2, 1},      // input connected to ground
-     {3, 0},      // input connected to Voltage pickup
-     {4, 1}, {6, 1}, {7, 1}, {0, 1}, {5, 1}, {3, 1}, // connected to P1
-     {4, 0}, {6, 0}, {0, 0}, {1, 0}, {7, 0}, {5, 0}};
-
-static constexpr uint8_t FirstP1input =
-    2; // this and rest of SwitchInput are connected to P1 pins
-// static constexpr float CalibCoeff = 22.; // that's for calibration with heaters
-
-// what is the "theoretical" value?
-// transformer under load 122.4/12.52
-// divider J1 to ADC = 0.025, divider outlet to ADC = 2.56e-3
-// divider current to ADC = 0.16824
-// ADC 1024 units to 1V, so there is 2.62 adc units for 1 outlet V, and
-// 172.3 unit per 1V Vcurrent
-// with SCT013 20A/1V scale, it is 8.61 ADC units per outlet A.
-// so, taken together it is 8.61*2.62 = 22.6. We do not need to convert
-// amplitude to RMS, happens automatically during integration
-static constexpr float CalibCoeff = 22.6;
-
-static constexpr tSwitchInput VoltagePort =
-    SwitchInput[1]; // input connected to Voltage pickup
-static constexpr uint8_t OpenPort[2] = {2, 1}; // open inputs for 1 and 2 chip
-static constexpr uint8_t GND_PortI = 0;        // input connected to the ground
-static constexpr tSwitchInput GND_port = SwitchInput[GND_PortI];
-
-static constexpr uint8_t NumCtrlLines_74HC4051 = 3;
-static constexpr uint8_t ControlLines[2][NumCtrlLines_74HC4051] = {
-    {D2, D1, D0}, {D7, D6, D5}}; // numbers of NodeMCU IO ports
+static constexpr uint8_t VoltagePortI = 0;  // input connected to Voltage pickup
+static constexpr uint8_t GND_portI = 13;  // input connected to Voltage pickup
 
 static bool RunSampling = true;
 
-static_assert(N_ELEMENTS(SwitchInput) == NUM_Inputs, "Just checking!");
+static_assert(N_ELEMENTS(SwitchInput) == NUM_ports, "Just checking!");
 
-static constexpr uint32_t
-GetDelay(uint8_t DelIndex) {      // exponentially scaled delay
+static constexpr uint32_t GetDelay(uint8_t DelIndex) {      // exponentially scaled delay
   return 10UL * pow(2, DelIndex); // us
 } // GetDelay
 
@@ -68,7 +29,7 @@ static constexpr uint32_t WF_SAMPLE_PERIOD =
     1000000UL / SAMPLES_IN_WF; // microseconds
 
 static uint32_t Delay =
-    GetDelay(5); // tuned for no visible phase shift. Hmm, HOW?
+    GetDelay(4); // tuned for no visible phase shift. Hmm, HOW?
 static uint32_t NewSample = micros();
 
 static void Set74HC4051_code(uint8_t c, uint8_t IC_num) {
@@ -76,23 +37,16 @@ static void Set74HC4051_code(uint8_t c, uint8_t IC_num) {
     digitalWrite(ControlLines[IC_num][BitI], (c >> BitI) & 1);
 } // Set74HC4051_code
 
-static void ConnectInput(tSwitchInput n) {
-  Set74HC4051_code(n.PortNum, n.IC_num); // connect the line we want
-  Set74HC4051_code(OpenPort[1 - n.IC_num],
-                   1 - n.IC_num); // connect another 74HC4051 to open line
-  delayMicroseconds(Delay);
-  yield();
-}
-
 static inline bool is_past(uint32_t time_us) {
   return (micros() - time_us) < (1UL << 31);
 } // is_past
 
-static uint32_t ScanTime; // ms
-static float Power[NUM_Inputs];
 // integration data
-static struct { float Power, Voltage, Current; } Integral;
-static uint8_t NumSamplesPerPort = 200;
+static struct {
+  float Power, Voltage, Current;
+  uint16_t NumSamples;
+} Integral[NUM_ports];
+
 static uint32_t NumScans;
 
 static void sample_port() {
@@ -102,12 +56,12 @@ static void sample_port() {
   static uint32_t ScanStartedMark;
 
   ScanStartedMark = millis();
-  ConnectInput(VoltagePort);
+  ConnectPort(VoltagePort);
   LastVoltage = analogRead(ANALOG_PIN);
   for (uint8_t SamplI = 0; SamplI < NumSamplesPerPort; SamplI++) {
-    ConnectInput(SwitchInput[CurPort]);
+    ConnectPort(SwitchInput[CurPort]);
     Current = analogRead(ANALOG_PIN);
-    ConnectInput(VoltagePort);
+    ConnectPort(VoltagePort);
     uint16_t Voltage = analogRead(ANALOG_PIN);
     LastVoltage = (LastVoltage + Voltage) / 2;
     Integral.Power += LastVoltage * Current;
@@ -120,7 +74,7 @@ static void sample_port() {
                    NumSamplesPerPort;
 
   Integral.Power = Integral.Current = Integral.Voltage = 0.;
-  if (++CurPort == NUM_Inputs) {
+  if (++CurPort == NUM_ports) {
     CurPort = 0;
     ++NumScans;
     ScanTime = millis() - ScanStartedMark;
@@ -149,16 +103,6 @@ void setupWiFi() {
 
   WiFi.softAP(AP_NameChar, WiFiAPPSK);
 }
-
-void initHardware() {
-  Serial.begin(115200);
-  Serial.println();
-
-  for (uint8_t PinI = 0; PinI < 6; PinI++)
-    pinMode(ControlLines[0][PinI], OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, 0);
-} // initHardware
 
 int debug_vprintf(const char *format, va_list a) {
   static constexpr uint8_t BUFFER_SIZE = 255;
@@ -239,7 +183,7 @@ void setup() {
   Serial.printf("Web server started, open %s in a web browser\n",
                 WiFi.localIP().toString().c_str());
   server.begin();
-  ConnectInput(VoltagePort);
+  ConnectPort(VoltagePort);
 } // setup
 
 static WiFiClient client;
@@ -278,7 +222,7 @@ static void sample_waveform() {
 
 static String samples2string(uint8_t FirstPort, bool Calibrate) {
   String s;
-  for (uint8_t p = FirstPort; p < NUM_Inputs; p++)
+  for (uint8_t p = FirstPort; p < NUM_ports; p++)
     s += String(Calibrate ? (Power[p] - Power[GND_PortI]) / CalibCoeff
                           : Power[p]) +
          "<br>";
@@ -325,7 +269,7 @@ void loop() {
         if (Port < 0 || Port > 7) {
           reply_and_stop(String(F("Wrong port number! <br>")));
         } else {
-          ConnectInput(SwitchInput[Port]);
+          ConnectPort(SwitchInput[Port]);
           delayMicroseconds(Delay);
           String s("Port  =");
           s += String(Port) + ", " + String(analogRead(ANALOG_PIN));
@@ -336,7 +280,7 @@ void loop() {
         if (Port < 0 || Port > 7) {
           reply_and_stop(String(F("Wrong port number! <br>")));
         } else {
-          ConnectInput(SwitchInput[Port]);
+          ConnectPort(SwitchInput[Port]);
           delayMicroseconds(Delay);
           WF_sampling_count = SAMPLES_IN_WF;
         }

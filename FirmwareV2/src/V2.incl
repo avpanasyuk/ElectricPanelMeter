@@ -1,0 +1,32 @@
+//////////////////////
+// WiFi Definitions //
+//////////////////////
+const char WiFiAPPSK[] = "esp54321";
+
+// hardware information about analog switched connections
+constexpr uint8_t PortsPer74HC4051 = 8;
+constexpr uint8_t NUM_ports = 2 * PortsPer74HC4051;
+constexpr uint8_t ControlLines[Num74HC4051][NumCtrlLines_74HC4051] = {
+    {D2, D1, D0}, {D5, D7, D6}}; // numbers of NodeMCU IO ports
+constexpr uint8_t Disable74HC4051_port[] = {D3, D4};
+
+static void SetPins() {
+    for (uint8_t SwitchI = 0; SwitchI < Num74HC4051; ++SwitchI) {
+    for (uint8_t PinI = 0; PinI < NumCtrlLines_74HC4051; PinI++)
+      pinMode(ControlLines[SwitchI][PinI], OUTPUT);
+    pinMode(Disable74HC4051_port[SwitchI], OUTPUT);
+  }
+
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, 0);
+} // SetPins
+
+static inline void ConnectPort(uint8_t port) {
+  uint8_t SwitchNum = port / PortsPer74HC4051;
+  port = port % PortsPer74HC4051;
+  digitalWrite(Disable74HC4051_port[1 - SwitchNum], 1); // disable other switch
+  Set74HC4051_code(port, SwitchNum);                // connect the line we want
+  digitalWrite(Disable74HC4051_port[SwitchNum], 0); // enable this switch
+  yield();
+  delayMicroseconds(Delay);
+} // ConnectPort

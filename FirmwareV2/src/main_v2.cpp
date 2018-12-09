@@ -6,33 +6,16 @@
 #include <stdint.h>
 #include <stdio.h>
 
-//////////////////////
-// WiFi Definitions //
-//////////////////////
-const char WiFiAPPSK[] = "esp54321";
-
 /////////////////////
 // Pin Definitions //
 /////////////////////
 const uint8_t LED_PIN = D8; // Thing's onboard, green LED
 const int ANALOG_PIN = A0;  // The only analog pin on the Thing
-constexpr uint8_t PortsPer74HC4051 = 8;
-constexpr uint8_t NUM_ports = 2 * PortsPer74HC4051;
-constexpr uint8_t NUM_I_ports =
-    NUM_ports - 2; // minus Voltage port and GND ports
-constexpr uint8_t VoltagePortI = 0;
-constexpr uint8_t GND_PortI = NUM_ports - 1;
-
 constexpr uint8_t NumCtrlLines_74HC4051 = 3;
 constexpr uint8_t Num74HC4051 = 2;
-constexpr uint8_t ControlLines[Num74HC4051][NumCtrlLines_74HC4051] = {
-    {D2, D1, D0}, {D5, D7, D6}}; // numbers of NodeMCU IO ports
-constexpr uint8_t Disable74HC4051_port[] = {D3, D4};
-
 static bool RunSampling = true;
 
-static constexpr uint32_t
-GetDelay(uint8_t DelIndex) {      // exponentially scaled delay
+static constexpr uint32_t GetDelay(uint8_t DelIndex) {      // exponentially scaled delay
   return 10UL * pow(2, DelIndex); // us
 } // GetDelay
 
@@ -41,24 +24,23 @@ static constexpr uint16_t SAMPLES_IN_WF = 600;
 static constexpr uint32_t WF_SAMPLE_PERIOD =
     1000000UL / SAMPLES_IN_WF; // microseconds
 
-static uint32_t Delay =
-    GetDelay(4); // tuned for no visible phase shift. Hmm, HOW?
+static uint32_t Delay = GetDelay(4); // tuned for no visible phase shift. Hmm, HOW?
 static uint32_t NewSample = micros();
+static inline void Set74HC4051_code(uint8_t c, uint8_t SwitchNum);
+
+#if VERSION == 2
+#include "V2.incl"
+#else
+#include "V1.incl"
+#endif
+
+constexpr uint8_t VoltagePortI = 0;
+constexpr uint8_t GND_PortI = NUM_ports - 1;
 
 static inline void Set74HC4051_code(uint8_t c, uint8_t SwitchNum) {
   for (uint8_t BitI = 0; BitI < NumCtrlLines_74HC4051; BitI++)
     digitalWrite(ControlLines[SwitchNum][BitI], (c >> BitI) & 1);
 } // Set74HC4051_code
-
-static inline void ConnectPort(uint8_t port) {
-  uint8_t SwitchNum = port / PortsPer74HC4051;
-  port = port % PortsPer74HC4051;
-  digitalWrite(Disable74HC4051_port[1 - SwitchNum], 1); // disable other switch
-  Set74HC4051_code(port, SwitchNum);                // connect the line we want
-  digitalWrite(Disable74HC4051_port[SwitchNum], 0); // enable this switch
-  delayMicroseconds(Delay);
-  yield();
-} // ConnectPort
 
 static inline bool is_past(uint32_t time_us) {
   return (micros() - time_us) < (1UL << 31);
@@ -74,17 +56,14 @@ static uint32_t NumScans;
 
 /**
 sample_port() samples samples over one 60 Hz Wave alternatively from CurPort
-port and
-from VoltagePort and then accumulates them into Power[CurPort] and
-NumSamples[NUM_ports]
-and moves CurPort to the next port
+port and from VoltagePort and then accumulates them into Power[CurPort] and
+NumSamples[NUM_ports] and moves CurPort to the next port
 */
 static void sample_port() {
   static uint8_t CurPort = 0;
 
   ConnectPort(VoltagePortI);
-  uint32_t Voltage = analogRead(
-      ANALOG_PIN); // it is 32-bit to avoid overflow on multiplication
+  uint32_t Voltage = analogRead(ANALOG_PIN); // it is 32-bit to avoid overflow on multiplication
   uint32_t SampleUntil = micros() + 1000000UL / 60;
   while (SampleUntil - micros() < (uint32_t(0) - 1) / 2) {
     ConnectPort(CurPort);
@@ -130,20 +109,6 @@ void setupWiFi() {
   WiFi.softAP(AP_NameChar, WiFiAPPSK);
 }
 
-void initHardware() {
-  Serial.begin(115200);
-  Serial.println();
-
-  for (uint8_t SwitchI = 0; SwitchI < Num74HC4051; ++SwitchI) {
-    for (uint8_t PinI = 0; PinI < NumCtrlLines_74HC4051; PinI++)
-      pinMode(ControlLines[SwitchI][PinI], OUTPUT);
-    pinMode(Disable74HC4051_port[SwitchI], OUTPUT);
-  }
-
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, 0);
-} // initHardware
-
 namespace AVP {
 //! writes or reads byte by byte in sequence
 class EEPROM_ {
@@ -188,7 +153,10 @@ uint8_t EEPROM_::CS;
 } // namespace AVP
 
 void setup() {
-  initHardware();
+  Serial.begin(115200);
+  Serial.println();
+
+SetPins();
   delay(3000);
 
   EEPROM.begin(514);
@@ -363,8 +331,8 @@ void loop() {
         // EEPROM.commit();
         EEPROM.end();
         reply_and_stop(String(F("WIFI is set to ")) + SSID + ":" + Pass);
-      } else if (req.lastIndexOf("/favicon.ico") == -1)
-        reply_and_stop(String(
+      } else if (req.lastIndexOf("/favicon.ico") != -1) client.stop();
+      else reply_and_stop(String(
             F("Invalid Request.<br> Try /read or /scan or /port/? or /wave/? "
               "or /ctrl/? or /wifi/ssid:password.")));
     } // new client request

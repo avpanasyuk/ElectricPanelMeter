@@ -1,5 +1,5 @@
 %% display results
-m = csvread('q:\PowerMonitor_main.csv',2);
+m = csvread('r:\PowerMonitor_main.csv',2);
 serial_date = datenum(1970,1,1) + m(:,1)/60/60/24 - 5/24; % last term is timezone
 
 % let's mark breaks > 10 min
