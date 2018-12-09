@@ -15,15 +15,15 @@ with requests.Session() as s:
   while True:
     time.sleep(5)
     try:
-      response = s.get('http://ESP_06CD4D.home/read',timeout=30) # V1 - main
-      # response = s.get('http://ESP_06D157.home/read',timeout=30) # V@ - sub
+      # response = s.get('http://ESP_06CD4D.home/read',timeout=30) # V1 - main
+      response = s.get('http://ESP_06D157.home/read',timeout=30) # V2 - sub
     except:
       print('Communication problem #' + str(comerri) + '\n')
       comerri = comerri + 1
       continue
     t = response.text
     open_ss = '<html>\r\n'
-    close_ss = '<br></html>'
+    close_ss = '<br>\r\n</html>'
     t = t[t.find(open_ss) ++ len(open_ss):t.find(close_ss)]
     t = t.replace('<br>',',')
     for c in t:
