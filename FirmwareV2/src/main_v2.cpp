@@ -9,69 +9,75 @@
 //////////////////////
 // WiFi Definitions //
 //////////////////////
-const char WiFiAPPSK[] = "esp12345";
+const char WiFiAPPSK[] = "esp54321";
 
 /////////////////////
 // Pin Definitions //
 /////////////////////
-const int LED_PIN = 5;     // Thing's onboard, green LED
+const uint8_t LED_PIN = D8;     // Thing's onboard, green LED
 const int ANALOG_PIN = A0; // The only analog pin on the Thing
+constexpr uint8_t NUM_I_ports = 14;
 
-// hardware information about analog switched connections
-static constexpr uint8_t NUM_Inputs = 14;
-static constexpr struct tSwitchInput {
-  uint8_t PortNum;
-  uint8_t IC_num; //!< U2 -> 0, U3 -> 1
-} SwitchInput[] = //! ports are in order they are located on P1
-    {{2, 1},      // input connected to ground
-     {3, 0},      // input connected to Voltage pickup
-     {4, 1}, {6, 1}, {7, 1}, {0, 1}, {5, 1}, {3, 1}, // connected to P1
-     {4, 0}, {6, 0}, {0, 0}, {1, 0}, {7, 0}, {5, 0}};
+// static constexpr float CalibCoeff = 22.; // that's for calibration with heaters
 
-static constexpr uint8_t FirstP1input = 2; // this and rest of SwitchInput are connected to P1 pins
-static constexpr float CalibCoeff = 22.;
+// FIXME what is the "theoretical" value?
+// transformer under load 122.4/12.52
+// divider J1 to ADC = 0.025, divider outlet to ADC = 2.56e-3
+// divider current to ADC = 0.16824
+// ADC 1024 units to 1V, so there is 2.62 adc units for 1 outlet V, and
+// 172.3 unit per 1V Vcurrent
+// with SCT013 20A/1V scale, it is 8.61 ADC units per outlet A.
+// so, taken together it is 8.61*2.62 = 22.6. We do not need to convert
+// amplitude to RMS, happens automatically during integration
+static constexpr float CalibCoeff = 22.6;
 
-static constexpr tSwitchInput VoltagePort = SwitchInput[1]; // input connected to Voltage pickup
-static constexpr uint8_t OpenPort[2] = {2, 1}; // open inputs for 1 and 2 chip
-static constexpr uint8_t GND_PortI = 0; // input connected to ground
-static constexpr tSwitchInput GND_port = SwitchInput[GND_PortI];
 
-static constexpr uint8_t ControlLines[2][3] = {
-    {D2, D1, D0}, {D7, D6, D5}}; // numbers of NodeMCU IO ports
+static constexpr uint8_t NumCtrlLines_74HC4051 = 3;
+static constexpr uint8_t ControlLines[2][NumCtrlLines_74HC4051] = {
+    {D2, D1, D0}, {D5, D7, D6}}; // numbers of NodeMCU IO ports
+static constexpr uint8_t Disable74HC4051_port[] = {D3, D4};
 
 static bool RunSampling = true;
 
-static_assert(N_ELEMENTS(SwitchInput) == NUM_Inputs, "Just checking!");
-
-static constexpr uint32_t GetDelay(uint8_t DelIndex) {
+static constexpr uint32_t GetDelay(uint8_t DelIndex) {      // exponentially scaled delay
   return 10UL * pow(2, DelIndex); // us
 } // GetDelay
 
+// WF acronim is WaveForm, one 60 Hz period
 static constexpr uint16_t SAMPLES_IN_WF = 600;
-static constexpr uint32_t WF_SAMPLE_INTERVAL =
+static constexpr uint32_t WF_SAMPLE_PERIOD =
     1000000UL / SAMPLES_IN_WF; // microseconds
 
-static uint32_t Delay = GetDelay(5); // tuned for no visible phase shift
+static uint32_t Delay = GetDelay(5); // tuned for no visible phase shift. Hmm, HOW?
 static uint32_t NewSample = micros();
 
-static void Set74HC4051_code(uint8_t c, uint8_t IC_num) {
-  for (uint8_t BitI = 0; BitI < 3; BitI++)
+static inline void Set74HC4051_code(uint8_t c, uint8_t IC_num) {
+  for (uint8_t BitI = 0; BitI < NumCtrlLines_74HC4051; BitI++)
     digitalWrite(ControlLines[IC_num][BitI], (c >> BitI) & 1);
 } // Set74HC4051_code
 
-static void ConnectInput(tSwitchInput n) {
-  Set74HC4051_code(n.PortNum, n.IC_num);
-  Set74HC4051_code(OpenPort[1 - n.IC_num], 1 - n.IC_num);
+static inline void ConnectPort(uint8_t port, uint8_t IC_num) {
+  digitalWrite(Disable74HC4051_port[1 - IC_num],1); // disable other switch
+  Set74HC4051_code(port, IC_num); // connect the line we want
+  digitalWrite(Disable74HC4051_port[IC_num],0); // enable this switch
   delayMicroseconds(Delay);
   yield();
-}
+} // ConnectPort
+
+static inline void ConnectI_Port(uint8_t port) {
+  if(port >= (NUM_I_ports >> 1)) ConnectPort(port - (NUM_I_ports >> 1),1);
+  else ConnectPort(port + 1,0);
+} // ConnectCurrentPort
+
+static void ConnectGND_Port() { ConnectPort(7,1); }
+static void ConnectV_Port() { ConnectPort(0,0); }
 
 static inline bool is_past(uint32_t time_us) {
   return (micros() - time_us) < (1UL << 31);
 } // is_past
 
 static uint32_t ScanTime; // ms
-static float Power[NUM_Inputs];
+static float Power[NUM_I_ports];
 // integration data
 static struct { float Power, Voltage, Current; } Integral;
 static uint8_t NumSamplesPerPort = 200;
@@ -79,30 +85,42 @@ static uint32_t NumScans;
 
 static void sample_port() {
   static uint8_t CurPort = 0;
-  static uint32_t Current;
-  static uint16_t LastVoltage;
-  static uint32_t ScanStartedMark = millis();
+  static uint16_t Current;
+  static uint32_t Voltage; // it is 32-bit to avoid overflow on multiplication
+  static uint32_t ScanStartedMark;
+  static float GND_Pwr = 0;
 
   ScanStartedMark = millis();
-  ConnectInput(VoltagePort);
-  LastVoltage = analogRead(ANALOG_PIN);
-  for(uint8_t SamplI=0; SamplI < NumSamplesPerPort; SamplI++) {
-    ConnectInput(SwitchInput[CurPort]);
+  ConnectV_Port();
+  Voltage = analogRead(ANALOG_PIN);
+  for (uint8_t SamplI = 0; SamplI < NumSamplesPerPort; SamplI++) {
+    ConnectI_Port(CurPort);
     Current = analogRead(ANALOG_PIN);
-    ConnectInput(VoltagePort);
-    uint16_t Voltage = analogRead(ANALOG_PIN);
-    LastVoltage = (LastVoltage + Voltage) / 2;
-    Integral.Power += LastVoltage * Current;
-    Integral.Voltage += LastVoltage;
+    ConnectV_Port();
+    auto PrevVoltage = Voltage;
+    Voltage = analogRead(ANALOG_PIN);
+    PrevVoltage = (PrevVoltage + Voltage) / 2; // we are trying to remove phase shift between
+    // current and voltage by linearlky interpolating voltage sample before and after current
+    Integral.Power += PrevVoltage * Current;
+    Integral.Voltage += PrevVoltage;
     Integral.Current += Current;
-    LastVoltage = Voltage;
   }
-  Power[CurPort] =
-      (Integral.Power - Integral.Current * Integral.Voltage / NumSamplesPerPort) /
-      NumSamplesPerPort;
+
+  // let's evaluate noise on GND line
+  ConnectGND_Port();
+  uint16_t GND_I = analogRead(ANALOG_PIN);
+  ConnectV_Port();
+  Voltage = (Voltage + analogRead(ANALOG_PIN))/2;
+  GND_Pwr = GND_Pwr?GND_I*Voltage:(GND_Pwr*0.999 + GND_I*Voltage*0.001); // averaging
+
+  Power[CurPort] = (Integral.Power -
+                    Integral.Current * Integral.Voltage / NumSamplesPerPort) /
+                   NumSamplesPerPort - GND_Pwr; // subtracting noise
+
+  if(Power[CurPort] < 0) Power[CurPort] = 0;
 
   Integral.Power = Integral.Current = Integral.Voltage = 0.;
-  if (++CurPort == NUM_Inputs) {
+  if (++CurPort == NUM_I_ports) {
     CurPort = 0;
     ++NumScans;
     ScanTime = millis() - ScanStartedMark;
@@ -139,6 +157,8 @@ void initHardware() {
   for (uint8_t PinI = 0; PinI < 6; PinI++)
     pinMode(ControlLines[0][PinI], OUTPUT);
   pinMode(LED_PIN, OUTPUT);
+  pinMode(Disable74HC4051_port[0], OUTPUT);
+  pinMode(Disable74HC4051_port[1], OUTPUT);
   digitalWrite(LED_PIN, 0);
 } // initHardware
 
@@ -221,12 +241,12 @@ void setup() {
   Serial.printf("Web server started, open %s in a web browser\n",
                 WiFi.localIP().toString().c_str());
   server.begin();
-  ConnectInput(VoltagePort);
+  ConnectV_Port();
 } // setup
 
 static WiFiClient client;
 
-static void reply(const String &message) {
+static void reply_and_stop(const String &message) {
   String s(F("HTTP/1.1 200 OK\r\n"
              "Content-Type: text/html\r\n"
              "Refresh: 5\r\n\r\n" // refresh the page automatically every 5 sec
@@ -237,7 +257,7 @@ static void reply(const String &message) {
   delay(1);
   Serial.println("Client disconnected.");
   client.stop();
-} // reply
+} // reply_and_stop
 
 static uint16_t WF_sampling_count;
 
@@ -252,28 +272,28 @@ static void sample_waveform() {
       String s;
       for (uint16_t SampleI = 0; SampleI < SAMPLES_IN_WF; ++SampleI)
         s += String(Waveform[SampleI]) + " ";
-      reply(s);
+      reply_and_stop(s);
     }
-    NewSample = micros() + WF_SAMPLE_INTERVAL;
+    NewSample = micros() + WF_SAMPLE_PERIOD;
   }
 } // sample_waveform
 
-static String samples2string(uint8_t FirstPort, bool Calibrate) {
+static String samples2string(bool Calibrate) {
   String s;
-  for (uint8_t p = FirstPort; p < NUM_Inputs; p++)
-    s += String(Calibrate?(Power[p]-Power[GND_PortI])/CalibCoeff:Power[p]) + "<br>";
+  for (uint8_t p = 0; p < NUM_I_ports; p++)
+    s += String(Calibrate ? Power[p] / CalibCoeff : Power[p]) + "<br>";
   return (s);
 } // samples2string
 
 void loop() {
-  if (client) {
-    if (WF_sampling_count)
-      sample_waveform();
-  } else {
+  if (client) { // client did not disconnect in previuos loop, it means that we
+    // are sampling WF, at most one sample per loop
+    if (WF_sampling_count) sample_waveform();
+  } else { // we are not sampling WF
     delay(10);
     if (RunSampling) sample_port();
 
-    // Check if a client has connected
+    // Check if a client has a Request
     client = server.available();
     if (client) {
       static uint8_t LEDstate = 1;
@@ -288,63 +308,63 @@ void loop() {
       int Port;
 
       if (req.lastIndexOf("/get") != -1) {
-        client.print(samples2string(FirstP1input, true) + "\n");
+        client.print(samples2string(true) + "\n");
         delay(1);
         client.stop();
         Serial.println("Client disconnected.");
       } else if (req.lastIndexOf("/read") != -1) {
-        reply(samples2string(FirstP1input, true));
+        reply_and_stop(samples2string(true));
       } else if (req.lastIndexOf("/sample") != -1) {
         String s("Scan N: " + String(NumScans) + ", Time: " + String(ScanTime) +
                  " ms<br>----------------------------------<br>");
-        s += samples2string(0, false);
-        reply(s);
+        s += samples2string(false);
+        reply_and_stop(s);
       } else if ((Port = req.lastIndexOf("/port")) != -1) {
         // let's read port number
         Port = (req.charAt(Port + strlen("/port/")) - '0');
-        if (Port < 0 || Port > 7) {
-          reply(String(F("Wrong port number! <br>")));
+        if (Port < 0 || Port > 15) {
+          reply_and_stop(String(F("Wrong port number! <br>")));
         } else {
-          ConnectInput(SwitchInput[Port]);
-          delayMicroseconds(Delay);
+          if(Port == 0) ConnectV_Port(); else if(Port == 15) ConnectGND_Port();
+          else ConnectI_Port(Port);
           String s("Port  =");
           s += String(Port) + ", " + String(analogRead(ANALOG_PIN));
-          reply(s);
+          reply_and_stop(s);
         }
       } else if ((Port = req.lastIndexOf("/wave")) != -1) {
         Port = (req.charAt(Port + strlen("/wave/")) - '0');
-        if (Port < 0 || Port > 7) {
-          reply(String(F("Wrong port number! <br>")));
+        if (Port < 0 || Port > 15) {
+          reply_and_stop(String(F("Wrong port number! <br>")));
         } else {
-          ConnectInput(SwitchInput[Port]);
-          delayMicroseconds(Delay);
+          if(Port == 0) ConnectV_Port(); else if(Port == 15) ConnectGND_Port();
+          else ConnectI_Port(Port);
           WF_sampling_count = SAMPLES_IN_WF;
         }
       } else if ((Port = req.lastIndexOf("/delay")) != -1) {
         Delay = GetDelay(req.charAt(Port + strlen("/delay/")) - '0');
-        reply(String(F("Delay is set to ")) + String(Delay) +
+        reply_and_stop(String(F("Delay is set to ")) + String(Delay) +
               " microseconds.<br>");
       } else if ((Port = req.lastIndexOf("/ctrl")) != -1) {
         Port = (req.charAt(Port + strlen("/ctrl/")) - '0');
         switch (Port) {
-        case 2: {
+        case 2: { // how fast analogRead is. Seems to be 100 us.
           uint32_t Start = micros();
           for (uint16_t n = 10000; n; --n) {
             analogRead(ANALOG_PIN);
           }
-          reply(String(F("10000 loops over ")) + String(micros() - Start) +
+          reply_and_stop(String(F("10000 loops over ")) + String(micros() - Start) +
                 " us");
           break;
         }
         case 0:
         case 1:
           RunSampling = Port;
-          reply(String(F("Continuos sampling turned ")) +
+          reply_and_stop(String(F("Continuos sampling turned ")) +
                 String(Port ? "off" : "on"));
           NewSample = micros();
           break;
         default:
-          reply(String(F("Unknown control command!")));
+          reply_and_stop(String(F("Unknown control command!")));
           break;
         }
       } else if ((Port = req.lastIndexOf("/wifi")) != -1) {
@@ -359,9 +379,9 @@ void loop() {
         AVP::EEPROM_::WriteString(Pass);
         // EEPROM.commit();
         EEPROM.end();
-        reply(String(F("WIFI is set to ")) + SSID + ":" + Pass + "<br>");
+        reply_and_stop(String(F("WIFI is set to ")) + SSID + ":" + Pass + "<br>");
       } else
-        reply(String(
+        reply_and_stop(String(
             F("Invalid Request.<br> Try /read or /sample or /port/? or /wave/? "
               "or /ctrl/? or /wifi/ssid:password.")));
     }

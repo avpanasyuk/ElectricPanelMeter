@@ -3,3 +3,8 @@ Project Logs for PCB_Project
 Project Outputs for PCB_Project
 __Previews
 *.LOG
+/*.cctpref
+/*.do
+/*.dsn
+/*.PrjPcbStructure
+/Project Outputs for PCB_Project_A
