@@ -32,6 +32,6 @@ with requests.Session() as s:
         break
     else:
       print(t)
-      with open('/RAIDZ2/R/PowerMonitor_main.csv', 'a') as file:
+      with open('/RAIDZ2/R/PowerMonitor_sub.csv', 'a') as file:
         file.write(str(time.time()) + ',' + t + '\n') 
       
