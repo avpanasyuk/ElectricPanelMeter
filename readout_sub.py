@@ -7,9 +7,17 @@ Created on Sat Feb  3 16:33:52 2018
 
 import requests
 import time
+import datetime
+import sys
+import re
 
 comerri = 0
 numbers = list(map(chr,range(ord('0'),ord('9')+1))) + [',','.','-']
+# lets see whether it is main or sub script
+try:
+  type = re.search('readout_(.+?).py',sys.argv[0])
+except:
+  print('Script name should be "readout_<type>.py", it is not!')
 
 with requests.Session() as s:
   while True:
@@ -24,7 +32,7 @@ with requests.Session() as s:
     t = response.text
     open_ss = '<html>\r\n'
     close_ss = '<br>\r\n</html>'
-    t = t[t.find(open_ss) ++ len(open_ss):t.find(close_ss)]
+    t = t[t.find(open_ss) + len(open_ss):t.find(close_ss)]
     t = t.replace('<br>',',')
     for c in t:
       if c not in numbers:
@@ -32,6 +40,8 @@ with requests.Session() as s:
         break
     else:
       print(t)
-      with open('/RAIDZ2/R/PowerMonitor_sub.csv', 'a') as file:
+      CurMonth = datetime.datetime.now().strftime('%h')
+      with open('/RAIDZ2/R/PowerMonitor.' + datetime.datetime.now().strftime('%h') + 
+        '.' + type + '.csv', 'a') as file:
         file.write(str(time.time()) + ',' + t + '\n') 
       
