@@ -14,17 +14,22 @@ const int ANALOG_PIN = A0;  // The only analog pin on the Thing
 constexpr uint8_t NumCtrlLines_74HC4051 = 3;
 constexpr uint8_t Num74HC4051 = 2;
 static bool RunSampling = true;
+constexpr uint32_t WatchDogTime = 1000UL * 60 * 5; // 5 min in ms
 
-static constexpr uint32_t GetDelay(uint8_t DelIndex) {      // exponentially scaled delay
+static constexpr uint32_t
+GetDelay(uint8_t DelIndex) {      // exponentially scaled delay
   return 10UL * pow(2, DelIndex); // us
 } // GetDelay
+
+static void (*resetFunc)(void) = 0; // declare reset function at address 0
 
 // WF acronim is WaveForm, one 60 Hz period
 static constexpr uint16_t SAMPLES_IN_WF = 600;
 static constexpr uint32_t WF_SAMPLE_PERIOD =
     1000000UL / SAMPLES_IN_WF; // microseconds
 
-static uint32_t Delay = GetDelay(4); // tuned for no visible phase shift. Hmm, HOW?
+static uint32_t Delay =
+    GetDelay(4); // tuned for no visible phase shift. Hmm, HOW?
 static uint32_t NewSample = micros();
 static inline void Set74HC4051_code(uint8_t c, uint8_t SwitchNum);
 
@@ -42,13 +47,17 @@ static inline void Set74HC4051_code(uint8_t c, uint8_t SwitchNum) {
     digitalWrite(ControlLines[SwitchNum][BitI], (c >> BitI) & 1);
 } // Set74HC4051_code
 
-static inline bool is_past(uint32_t time_us) {
+static inline bool is_past_us(uint32_t time_us) {
   return (micros() - time_us) < (1UL << 31);
+} // is_past
+
+static inline bool is_past_ms(uint32_t time_ms) {
+  return (millis() - time_ms) < (1UL << 31);
 } // is_past
 
 // integration data
 static struct {
-  float Power, Voltage, Current;
+  float PowerRe, PowerIm, Voltage, VoltageQourter, Current;
   uint32_t NumSamples;
 } Integral[NUM_ports];
 
@@ -56,30 +65,74 @@ static uint32_t NumScans;
 
 /**
 samples samples over one 60 Hz Wave alternatively from CurPort
-port and from VoltagePort and then accumulates them into Power[CurPort] and
+port and from VoltagePort and then accumulates them into PowerRe[CurPort] and
 NumSamples[NUM_ports] and moves CurPort to the next port
+
+NEW: it looks like we do need phase information, as our Voltage signal seems to
+have very significant phase shift, which screwes our measurement badly. So, to
+get an imaginary part, we got to start collecting Voltage samples a quater
+wavelength
+in advance, and do multiplication by cotimed samples and shifted by 1/4 WL
 */
 static inline void sample_port_and_go_to_next() {
   static uint8_t CurPort = 0;
+  static uint16_t BufferSize = 20; // just some initial size
+  static uint16_t *pVoltageBuffer =
+      new uint16_t[BufferSize]; // lets make autogrowing buffer
+  uint16_t VoltageSampleI = 0;
+  uint16_t VoltageIquorterShift = 0;
+
+  uint32_t QuorterUntil =
+      micros() + 1000000UL / 60 / 4; // that's when 1/4 WL presampling stops
+  uint32_t SampleUntil =
+      QuorterUntil + 1000000UL / 60; // and them we sample for another WL
 
   ConnectPort(VoltagePortI);
-  uint32_t Voltage = analogRead(ANALOG_PIN); // it is 32-bit to avoid overflow on multiplication
-  uint32_t SampleUntil = micros() + 1000000UL / 60; // sample for one 60Hz wave period
+  uint16_t Voltage = analogRead(ANALOG_PIN); // to avoid phase shift we will
+  // average voltage betweenn two consequitive samples, to bring time to
+  // the same moment I sample current
   while (SampleUntil - micros() < (uint32_t(0) - 1) / 2) {
+    if (VoltageSampleI == BufferSize) { // oops, got to grow the buffer
+      uint16_t *pOldBuffer = pVoltageBuffer;
+      pVoltageBuffer = new uint16_t[BufferSize *= 2];
+      memcpy(pVoltageBuffer, pOldBuffer,
+             BufferSize); // means BufferSize/2*sizeof(uint16_t)
+      delete[] pOldBuffer;
+    }
+
     ConnectPort(CurPort);
-    uint16_t Current = analogRead(ANALOG_PIN);
+    uint32_t Current = analogRead(
+        ANALOG_PIN); // it is 32-bit to avoid overflow on multiplication
     ConnectPort(VoltagePortI);
-    auto PrevVoltage = Voltage;
-    Voltage = analogRead(ANALOG_PIN);
-    PrevVoltage = (PrevVoltage + Voltage) / 2;
-    // we are trying to remove phase shift between
-    // current and voltage by linearlky interpolating voltage sample before and
-    // after current
-    Integral[CurPort].Power += PrevVoltage * Current;
-    Integral[CurPort].Voltage += PrevVoltage;
-    Integral[CurPort].Current += Current;
-    Integral[CurPort].NumSamples++;
+    uint16_t NewVoltage = analogRead(ANALOG_PIN);
+    Voltage = (Voltage + NewVoltage) / 2;
+    pVoltageBuffer[VoltageSampleI++] = Voltage;
+
+    if (QuorterUntil - micros() < (uint32_t(0) - 1) / 2) {
+      // We are precollecting voltage samples. To keep the period we have to do
+      // the same calculations
+      volatile float Idle;
+      Idle += Voltage;
+      Idle += Voltage * Current;
+      Idle += pVoltageBuffer[VoltageSampleI - VoltageIquorterShift];
+      Idle += pVoltageBuffer[VoltageSampleI - VoltageIquorterShift] * Current;
+
+      Idle += Current;
+    } else {
+      if (VoltageIquorterShift == 0)
+        VoltageIquorterShift = VoltageSampleI;
+      Integral[CurPort].Voltage += Voltage;
+      Integral[CurPort].PowerRe += Voltage * Current;
+      // Next is voltage shift by 1/4 WL
+      Integral[CurPort].VoltageQourter +=
+          pVoltageBuffer[VoltageSampleI - VoltageIquorterShift];
+      Integral[CurPort].PowerIm +=
+          pVoltageBuffer[VoltageSampleI - VoltageIquorterShift] * Current;
+      Integral[CurPort].Current += Current;
+      Integral[CurPort].NumSamples++;
+    }
     // yield();
+    Voltage = NewVoltage;
   }
   if (++CurPort == NUM_ports) {
     CurPort = 0;
@@ -99,7 +152,7 @@ void setupWiFi() {
   String macID = String(mac[WL_MAC_ADDR_LENGTH - 2], HEX) +
                  String(mac[WL_MAC_ADDR_LENGTH - 1], HEX);
   macID.toUpperCase();
-  String AP_NameString = "ESP8266 Thing " + macID;
+  String AP_NameString = "ElPanelV2 " + macID;
 
   char AP_NameChar[AP_NameString.length() + 1];
   memset(AP_NameChar, 0, AP_NameString.length() + 1);
@@ -157,7 +210,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println();
 
-SetPins();
+  SetPins();
   delay(3000);
 
   EEPROM.begin(514);
@@ -215,7 +268,7 @@ static void sample_waveform() {
   static uint16_t Waveform[SAMPLES_IN_WF];
   // Serial.printf("%lu-%lu..", micros(), EndDelay);
 
-  if (is_past(NewSample)) {
+  if (is_past_us(NewSample)) {
     NewSample = micros() + WF_SAMPLE_PERIOD; // to keep rate
     Waveform[--WF_sampling_count] = analogRead(ANALOG_PIN);
     // Serial.printf("%d..", WF_sampling_count);
@@ -232,37 +285,45 @@ static String samples2string() {
   String s;
   for (uint8_t CurPort = 0; CurPort < NUM_ports; ++CurPort) {
     auto &I = Integral[CurPort];
-    float Power =
-        (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
-    s += String(Power) + "<br>";
-    I.Power = I.Current = I.Voltage = 0.;
+    float PowerRe = (I.PowerRe - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
+    float PowerIm = (I.PowerIm - I.Current * I.VoltageQourter / I.NumSamples) / I.NumSamples;
+    s += String(PowerRe) + "<br>" + String(PowerIm) + "<br>";
+    I.PowerIm = I.PowerRe = I.Current = I.Voltage = I.VoltageQourter = 0.;
     I.NumSamples = 0;
   }
   return (s);
 } // samples2string
 
 void loop() {
+  // lets do watchdog timer
+  static uint32_t WD_trigger = millis() + WatchDogTime;
+  if (is_past_ms(WD_trigger))
+    resetFunc();
+
   yield();
   if (client) { // client did not disconnect in previuos loop, it means that we
     // are sampling WF, at most one sample per loop
-    if (WF_sampling_count) sample_waveform();
+    if (WF_sampling_count)
+      sample_waveform();
   } else { // we are not sampling WF
     delay(5);
-    if (RunSampling) sample_port_and_go_to_next();
+    if (RunSampling)
+      sample_port_and_go_to_next();
 
     // Check if a client has a Request
     client = server.available();
     if (client) {
       static uint8_t LEDstate = 1;
       digitalWrite(LED_PIN, LEDstate = 1 - LEDstate);
+      WD_trigger = millis() + WatchDogTime; // reset watchdog
 
       // Read the first line of the request
       String req = client.readStringUntil('\r');
-      if(req.length() == 0) {
+      if (req.length() == 0) {
         delay(100);
         req = client.readStringUntil('\r');
       }
-      if(req.length() == 0) {
+      if (req.length() == 0) {
         client.stop();
         return;
       }
@@ -341,10 +402,12 @@ void loop() {
         // EEPROM.commit();
         EEPROM.end();
         reply_and_stop(String(F("WIFI is set to ")) + SSID + ":" + Pass);
-      } else if (req.lastIndexOf("/favicon.ico") != -1) client.stop();
-      else reply_and_stop(
-            String("Invalid Request:<") + req + F(">. Try /read or /scan or /port/? or /wave/? "
-              "or /ctrl/? or /wifi/ssid:password."));
+      } else if (req.lastIndexOf("/favicon.ico") != -1)
+        client.stop();
+      else
+        reply_and_stop(String("Invalid Request:<") + req +
+                       F(">. Try /read or /scan or /port/? or /wave/? "
+                         "or /ctrl/? or /wifi/ssid:password."));
     } // new client request
   }   // client was closed on previous loop
 } // loop

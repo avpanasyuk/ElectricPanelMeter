@@ -1,4 +1,7 @@
-function show(filename,indexes)
+function show1(filename,indexes)
+  %> SHOW1 differs from SHOW in that it works with the firmware in the
+  %> sender which sends complex wattages, so instead of one value per circuit
+  %> real/image pair comes
   %> @param indexes - indexes of circuits to show
   if strfind(filename,'sub.'), run conf_sub.m; else
     if strfind(filename,'main.'), run conf_main.m; else
@@ -43,13 +46,13 @@ function show(filename,indexes)
   datetick('x','dd-HH:MM')
   % set(gca,'XTickMode','auto')
   xlabel('Day-Hour')
-  ylabel('Re(Watts)')
+  ylabel('angle(Watts)')
   % AVP.PLOT.legend(cellstr([num2str([1:14;price].')]))  
   [ax,objs,ploth,texth] = AVP.PLOT.legend(strcat(cellstr(num2str([1:numel(price);price].',...
     '%2i %3.0f <')), {conf.port(:).name}.'),'Location','Best');
   [objs(1:numel(objs)/3).FontName] = deal('Monospaced');
   subplot(2,1,2)
-  plot(hour/24,abs(angle(Watts)))
+  plot(hour/24,angle(Watts))
   datetick('x','dd-HH:MM')
   % set(gca,'XTickMode','auto')
   xlabel('Day-Hour')
