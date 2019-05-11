@@ -25,6 +25,25 @@ Rvv = Rsw^2*Rout % 0.0026373
 
 14000*Rvv*20 = 740. % Should be 780. hmm?
 
+% writing sample configuration file for main
+conf.coeff = 0.00242;
+[conf.port(5:12).coeff] = deal(50)
+[conf.port(1:4).coeff] = deal(18.8)
+[conf.port(:).name] = deal('');
+
+f = fopen([PROJECT_DIR, '\conf_main.m'],'wt');
+fwrite(f,AVP.nested_var2code('conf'));
+fclose(f);
+
+% writing sample configuration file for subpanel
+conf.coeff = 0.0026373;
+[conf.port(1:14).coeff] = deal(50)
+[conf.port(:).name] = deal('');
+
+f = fopen([PROJECT_DIR, '\conf_sub.m'],'wt');
+fwrite(f,AVP.nested_var2code('conf'));
+fclose(f);
+
 
 
 %% OLD CALIBRATION

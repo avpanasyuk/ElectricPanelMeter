@@ -49,22 +49,22 @@ static inline bool is_past(uint32_t time_us) {
 // integration data
 static struct {
   float Power, Voltage, Current;
-  uint16_t NumSamples;
+  uint32_t NumSamples;
 } Integral[NUM_ports];
 
 static uint32_t NumScans;
 
 /**
-sample_port() samples samples over one 60 Hz Wave alternatively from CurPort
+samples samples over one 60 Hz Wave alternatively from CurPort
 port and from VoltagePort and then accumulates them into Power[CurPort] and
 NumSamples[NUM_ports] and moves CurPort to the next port
 */
-static void sample_port() {
+static inline void sample_port_and_go_to_next() {
   static uint8_t CurPort = 0;
 
   ConnectPort(VoltagePortI);
   uint32_t Voltage = analogRead(ANALOG_PIN); // it is 32-bit to avoid overflow on multiplication
-  uint32_t SampleUntil = micros() + 1000000UL / 60;
+  uint32_t SampleUntil = micros() + 1000000UL / 60; // sample for one 60Hz wave period
   while (SampleUntil - micros() < (uint32_t(0) - 1) / 2) {
     ConnectPort(CurPort);
     uint16_t Current = analogRead(ANALOG_PIN);
@@ -79,12 +79,13 @@ static void sample_port() {
     Integral[CurPort].Voltage += PrevVoltage;
     Integral[CurPort].Current += Current;
     Integral[CurPort].NumSamples++;
+    // yield();
   }
   if (++CurPort == NUM_ports) {
     CurPort = 0;
     ++NumScans;
   }
-} // sample_port
+} // sample_port_and_go_to_next
 
 WiFiServer server(80);
 
@@ -197,7 +198,7 @@ static void reply_and_stop(const String &message) {
              "Refresh: 5\r\n\r\n" // refresh the page automatically every 5 sec
              "<!DOCTYPE HTML>\r\n<html>\r\n"));
   s += message;
-  s += "<br>\r\n</html>";
+  s += "<br></html>";
   client.println(s);
   // client.flush();
   delay(1);
@@ -241,13 +242,13 @@ static String samples2string() {
 } // samples2string
 
 void loop() {
+  yield();
   if (client) { // client did not disconnect in previuos loop, it means that we
     // are sampling WF, at most one sample per loop
-    if (WF_sampling_count)
-      sample_waveform();
+    if (WF_sampling_count) sample_waveform();
   } else { // we are not sampling WF
     delay(5);
-    if (RunSampling) sample_port();
+    if (RunSampling) sample_port_and_go_to_next();
 
     // Check if a client has a Request
     client = server.available();
@@ -257,6 +258,15 @@ void loop() {
 
       // Read the first line of the request
       String req = client.readStringUntil('\r');
+      if(req.length() == 0) {
+        delay(100);
+        req = client.readStringUntil('\r');
+      }
+      if(req.length() == 0) {
+        client.stop();
+        return;
+      }
+
 #ifdef DEBUG
       Serial.println("Received: " + req);
 #endif
@@ -311,7 +321,7 @@ void loop() {
         case 1:
           RunSampling = Port;
           reply_and_stop(String(F("Continuos sampling turned ")) +
-                         String(Port ? "off" : "on"));
+                         String(Port ? "on" : "off"));
           NewSample = micros();
           break;
         default:
@@ -332,9 +342,9 @@ void loop() {
         EEPROM.end();
         reply_and_stop(String(F("WIFI is set to ")) + SSID + ":" + Pass);
       } else if (req.lastIndexOf("/favicon.ico") != -1) client.stop();
-      else reply_and_stop(String(
-            F("Invalid Request.<br> Try /read or /scan or /port/? or /wave/? "
-              "or /ctrl/? or /wifi/ssid:password.")));
+      else reply_and_stop(
+            String("Invalid Request:<") + req + F(">. Try /read or /scan or /port/? or /wave/? "
+              "or /ctrl/? or /wifi/ssid:password."));
     } // new client request
   }   // client was closed on previous loop
 } // loop
