@@ -7,17 +7,15 @@ function show(filename,indexes)
   end
   
   m = abs(csvread(filename,2)); % first string may be corrupted
-  % csv file structure: first column is epoch 1970 second, following are real/image pairs
-  % first pair is the volt channel, last one is ground
+  % csv file structure: first column is epoch 1970 second, second is volt
+  % channel, last one is ground
   hour = datenum(1970,1,1)*24 + m(:,1)/60/60 - 5; % last term is timezone
   % let's mark breaks > 10 min
   breaks = unique([1;find(AVP.diff(hour) > 1/6)+1;numel(hour)+1]);
-  
-  Watts = reshape(m(:,4:end),size(m,1),2,[]); % remove time mark and voltage channel
-  Watts = squeeze(complex(Watts(:,1,:),Watts(:,2,:))); % and convert to complex
-  Watts = Watts(:,1:end-1) - repmat(Watts(:,end),1,size(Watts,2)-1)*0; % ADC times ADC data, ground subtracted
+
+  Watts = max(m(:,3:end-1) - repmat(m(:,end),1,size(m,2)-3),0); % ADC times ADC data, ground subtracted
   Watts = Watts/conf.coeff; % ADC times ADC to "rms volt * rms volt" conversion factor
-  Watts = Watts./repmat([conf.port(:).coeff],size(Watts,1),1)*1000; % take into account transformers sensitivity 
+  Watts = Watts./repmat([conf.port(:).coeff],size(m,1),1)*1000; % take into account transformers sensitivity 
   % and convert "rms volt * rms volt" to "rms volt * rms amp = Watt"
   
   if exist('indexes','var') && numel(indexes) > 0
@@ -34,24 +32,16 @@ function show(filename,indexes)
     end
   end
   
-  price = abs(kWh)/1536*335/Hrs*30*24; % at current prices for one month
+  price = kWh/1536*335/Hrs*30*24; % at current prices for one month
   
   hour(breaks(2:end-1)) = NaN;
   
-  subplot(2,1,1)
-  plot(hour/24,real(Watts))
+  plot(hour/24,Watts)
   datetick('x','dd-HH:MM')
   % set(gca,'XTickMode','auto')
   xlabel('Day-Hour')
-  ylabel('Re(Watts)')
+  ylabel('Watts')
   % AVP.PLOT.legend(cellstr([num2str([1:14;price].')]))  
-  [ax,objs,ploth,texth] = AVP.PLOT.legend(strcat(cellstr(num2str([1:numel(price);price].',...
-    '%2i %3.0f <')), {conf.port(:).name}.'),'Location','Best');
+  [ax,objs,ploth,texth] = AVP.PLOT.legend(strcat(cellstr(num2str([1:numel(price);price].','%2i %3.0f <')), {conf.port(:).name}.'),'Location','Best');
   [objs(1:numel(objs)/3).FontName] = deal('Monospaced');
-  subplot(2,1,2)
-  plot(hour/24,abs(angle(Watts)))
-  datetick('x','dd-HH:MM')
-  % set(gca,'XTickMode','auto')
-  xlabel('Day-Hour')
-  ylabel('phase(Watts)')  
 end

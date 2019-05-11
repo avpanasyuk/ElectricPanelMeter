@@ -3,7 +3,7 @@ function show1(filename,indexes)
   %> sender which sends complex wattages, so instead of one value per circuit
   %> real/image pair comes
   %> @param indexes - indexes of circuits to show
-  if strfind(filename,'sub.'), run conf_sub.m; else
+  if strfind(filename,'sub.'), run conf_sub1.m; else
     if strfind(filename,'main.'), run conf_main.m; else
       error('Filename should contain either "sub." or "main." substring');
     end
@@ -46,7 +46,7 @@ function show1(filename,indexes)
   datetick('x','dd-HH:MM')
   % set(gca,'XTickMode','auto')
   xlabel('Day-Hour')
-  ylabel('angle(Watts)')
+  ylabel('real(Watts)')
   % AVP.PLOT.legend(cellstr([num2str([1:14;price].')]))  
   [ax,objs,ploth,texth] = AVP.PLOT.legend(strcat(cellstr(num2str([1:numel(price);price].',...
     '%2i %3.0f <')), {conf.port(:).name}.'),'Location','Best');
