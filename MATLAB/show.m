@@ -1,10 +1,9 @@
 function show(filename,indexes)
   %> @param indexes - indexes of circuits to show
-  if strfind(filename,'sub.'), run conf_sub.m; else
-    if strfind(filename,'main.'), run conf_main.m; else
-      error('Filename should contain either "sub." or "main." substring');
-    end
-  end
+  [~, name] = fileparts(filename);
+  Parsed = sscanf(name,'PowerMonitor.v%1c.%3s.%[submain]');
+  
+  run(['conf_', Parsed(5:end),'_v', Parsed(1), '.m'])
   
   m = abs(csvread(filename,2)); % first string may be corrupted
   % csv file structure: first column is epoch 1970 second, second is volt

@@ -1,4 +1,4 @@
-function show1(filename,indexes)
+function show_phase(filename,indexes)
   %> SHOW1 differs from SHOW in that it works with the firmware in the
   %> sender which sends complex wattages, so instead of one value per circuit
   %> real/image pair comes
