@@ -6,3 +6,9 @@
 /History/34F86422
 *.tags_swap
 .travis.yml
+*.ems
+*.FCStd
+*.FCStd1
+*.bak
+*.SLD*
+/Altium/*.DXF
