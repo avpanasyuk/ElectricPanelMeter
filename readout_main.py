@@ -46,8 +46,8 @@ with requests.Session() as s:
         break
     else:
       print(t)
-      CurMonth = datetime.datetime.now().strftime('%h')
-      with open('/RAIDZ2/R/PowerMonitor.v' + sys.argv[1] + '.' + datetime.datetime.now().strftime('%h') +
+      MM_YY = datetime.datetime.now().strftime('%m.%y')
+      with open('/RAIDZ2/R/ARCHIVE/POWER/PowerMonitor.v' + sys.argv[1] + '.' + MM_YY +
         '.' + type + '.csv', 'a') as file:
         file.write(str(time.time()) + ',' + t + '\n') 
       
