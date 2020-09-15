@@ -1,0 +1,74 @@
+(Block-name: Header)
+(Block-expand: 0)
+(Block-enable: 1)
+M3 S12000
+G4 P3
+G0 Z10
+(Block-name: 0 [P])
+(Block-expand: 0)
+(Block-enable: 1)
+(Block-color: #FFFFFF)
+G0 X-0.054 Y120.4405
+G1 Z0 f500
+G0 Z3
+(Block-name: 0)
+(Block-expand: 0)
+(Block-enable: 1)
+G0 Z3
+G0 X9.946 Y120.4405
+G0 Z0
+(entered)
+G1 X110.276 Y120.4405 Z0 f1200
+G2 X120.276 Y110.4405 I0 J-10 Z0
+G1 X120.276 Y10.1105 Z0
+G2 X110.276 Y0.1105 I-10 J0 Z0
+G1 X9.946 Y0.1105 Z0
+G2 X-0.054 Y10.1105 I0 J10 Z0
+G1 X-0.054 Y110.4405 Z0
+G2 X9.946 Y120.4405 I10 J0 Z0
+(exiting)
+G0 Z3
+(Block-name: 0)
+(Block-expand: 0)
+(Block-enable: 1)
+G0 Z3
+G0 X87.525 Y64.4665
+G0 Z0
+(entered)
+G2 X87.525 Y64.4665 I-1.125 J0 Z0 f1200
+G2 X87.525 Y64.4665 I-1.125 J0 Z0
+G2 X87.525 Y64.4665 I-1.125 J0 Z0
+G2 X87.525 Y64.4665 I-1.125 J0 Z0
+(exiting)
+G0 Z3
+(Block-name: 0)
+(Block-expand: 0)
+(Block-enable: 1)
+G0 Z3
+G0 X39.265 Y41.6065
+G0 Z0
+(entered)
+G2 X39.265 Y41.6065 I-1.125 J0 Z0 f1200
+G2 X39.265 Y41.6065 I-1.125 J0 Z0
+G2 X39.265 Y41.6065 I-1.125 J0 Z0
+G2 X39.265 Y41.6065 I-1.125 J0 Z0
+(exiting)
+G0 Z3
+(Block-name: 0)
+(Block-expand: 0)
+(Block-enable: 1)
+G0 Z3
+G0 X29.867 Y85.0405
+G0 Z0
+(entered)
+G2 X29.867 Y85.0405 I-1.125 J0 Z0 f1200
+G2 X29.867 Y85.0405 I-1.125 J0 Z0
+G2 X29.867 Y85.0405 I-1.125 J0 Z0
+G2 X29.867 Y85.0405 I-1.125 J0 Z0
+(exiting)
+G0 Z3
+(Block-name: Footer)
+(Block-expand: 0)
+(Block-enable: 1)
+M5
+G0 Z20

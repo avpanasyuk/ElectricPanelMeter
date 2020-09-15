@@ -1,46 +1,16 @@
 function show(filename,indexes)
   %> @param indexes - indexes of circuits to show
+  global PROJECT_DIR
+  
   [~, name] = fileparts(filename);
-  Parsed = sscanf(name,'PowerMonitor.v%1c.%3s.%[submain]');
+  Parsed = sscanf(name,'PowerMonitor.v%1c.%02d.%02d.%[submain]');
   
-  run(['conf_', Parsed(5:end),'_v', Parsed(1), '.m'])
-  
-  m = abs(csvread(filename,2)); % first string may be corrupted
-  % csv file structure: first column is epoch 1970 second, second is volt
-  % channel, last one is ground
-  hour = datenum(1970,1,1)*24 + m(:,1)/60/60 - 5; % last term is timezone
-  % let's mark breaks > 10 min
-  breaks = unique([1;find(AVP.diff(hour) > 1/6)+1;numel(hour)+1]);
-
-  Watts = max(m(:,3:end-1) - repmat(m(:,end),1,size(m,2)-3),0); % ADC times ADC data, ground subtracted
-  Watts = Watts/conf.coeff; % ADC times ADC to "rms volt * rms volt" conversion factor
-  Watts = Watts./repmat([conf.port(:).coeff],size(m,1),1)*1000; % take into account transformers sensitivity 
-  % and convert "rms volt * rms volt" to "rms volt * rms amp = Watt"
-  
-  if exist('indexes','var') && numel(indexes) > 0
-    Watts = Watts(:,indexes);
-    conf.port = conf.port(indexes);
-  end
-
-  kWh = 0; Hrs = 0;
-  for brI=1:numel(breaks)-1
-    brInds = [breaks(brI):breaks(brI+1)-1];
-    if numel(brInds) > 1 % trapz does not work otherwise
-      kWh = kWh + trapz(hour(brInds),Watts(brInds,:))/1000;
-      Hrs = Hrs + (hour(brInds(end),1) - hour(brInds(1),1));
-    end
+  if numel(Parsed) ~= 6 && numel(Parsed) ~= 7
+    error('File name seems to be in the wrong format, please check!')
   end
   
-  price = kWh/1536*335/Hrs*30*24; % at current prices for one month
+  run([PROJECT_DIR '\conf_', char(Parsed(4:end).'),'_v', Parsed(1), '.m'])
   
-  hour(breaks(2:end-1)) = NaN;
-  
-  plot(hour/24,Watts)
-  datetick('x','dd-HH:MM')
-  % set(gca,'XTickMode','auto')
-  xlabel('Day-Hour')
-  ylabel('Watts')
-  % AVP.PLOT.legend(cellstr([num2str([1:14;price].')]))  
-  [ax,objs,ploth,texth] = AVP.PLOT.legend(strcat(cellstr(num2str([1:numel(price);price].','%2i %3.0f <')), {conf.port(:).name}.'),'Location','Best');
-  [objs(1:numel(objs)/3).FontName] = deal('Monospaced');
+  [price, hour, Watts] = read_file(filename, conf);
+  plot_data(price, hour, Watts, conf);
 end
