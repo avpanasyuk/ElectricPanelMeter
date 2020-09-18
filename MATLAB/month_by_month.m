@@ -14,15 +14,15 @@ function month_by_month(PanelID)
     run([PROJECT_DIR '\conf_', char(Parsed(4:end).'),'_v', Parsed(1), '.m'])
     
     price(:,fI) = read_file(fn, conf);
-    month(fI) = Parsed(2) + 12*Parsed(3);
+    month(fI) = Parsed(2) + 12*Parsed(3) - 1;
   end
   [month_sorted, sI] = sort(month);
   plot(month_sorted,price(:,sI),'+-');
   AVP.PLOT.legend({conf.port(:).name}.','Location','Best');
   ax = gca;
-  m_str = strsplit(num2str(mod(ax.XTick,12)));
+  m_str = strsplit(num2str(mod(ax.XTick,12)+1));
   y_str = strsplit(num2str(fix(ax.XTick/12)));
   ax.XTickLabel = strcat(m_str','\',y_str');
-  ylabel('Dolalrs per month')
+  ylabel('Dollars per month')
   xlabel('Date MM\YR')
 end
