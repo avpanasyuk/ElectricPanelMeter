@@ -1,7 +1,7 @@
 function show1(IsSub,month,year,indexes)
   %> @param indexes - indexes of circuits to show
   global PROJECT_DIR
-  cd('R:\ARCHIVE\POWER');
+  cd('\\bsd\USB_FLASH');
   if IsSub, PanelID = 'sub'; else PanelID = 'main'; end
   FileNameTemp = sprintf(['PowerMonitor.v*.%02d.%02d.' PanelID '.csv'],month,year);
   f = dir(FileNameTemp);
