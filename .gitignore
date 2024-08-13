@@ -12,3 +12,5 @@
 *.bak
 *.SLD*
 /Altium/*.DXF
+/.vscode
+*.checksum
