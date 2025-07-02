@@ -21,11 +21,11 @@ static constexpr uint8_t ControlLines[Num74HC4051][NumCtrlLines_74HC4051] = {
 
 static void SetPins() {
     for (uint8_t SwitchI = 0; SwitchI < Num74HC4051; ++SwitchI)
-    for (uint8_t PinI = 0; PinI < NumCtrlLines_74HC4051; PinI++)
-      pinMode(ControlLines[SwitchI][PinI], OUTPUT);
+      for (uint8_t PinI = 0; PinI < NumCtrlLines_74HC4051; PinI++)
+        pinMode(ControlLines[SwitchI][PinI], OUTPUT);
 
-      pinMode(LED_PIN, OUTPUT);
-      digitalWrite(LED_PIN, 0);
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, 0);
 } // SetPins
 
 static void ConnectPort(uint8_t InputI) {
