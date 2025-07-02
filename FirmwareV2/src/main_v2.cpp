@@ -1,10 +1,10 @@
+#include <stdint.h>
+#include <stdio.h>
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
-#include <General/Macros.h>
-#include <General/Math.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "C_General/Macros.h"
+#include "C_General/MyMath.hpp"
 
 /////////////////////
 // Pin Definitions //
