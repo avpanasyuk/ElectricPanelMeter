@@ -80,8 +80,8 @@ NumSamples[NUM_ports] and moves CurPort to the next port
 */
 static inline void sample_port_and_go_to_next() {} // sample_port_and_go_to_next
 
-static String samples2string() {
-  String s;
+static const String &samples2string() {
+  static String s; s.reserve(512); s = ""; // reserve buffer for response to avoid dynamic memory allocation
   for(uint8_t CurPort = 0; CurPort < NUM_ports; ++CurPort) {
     auto &I = Integral[CurPort];
     float Power = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples / NumSamplesPerWL;
@@ -95,6 +95,8 @@ static String samples2string() {
 void setup() {
   Serial.begin(115200);
   Serial.println();
+  static String r; // reserve buffer for responses to avoid dynamic memory allocation
+  r.reserve(2048);
 
   SetPins();
   delay(3000);
@@ -114,8 +116,10 @@ void setup() {
 
   w.on("/read", HTTP_GET, [&]() { w.send(200, "text/html", samples2string()); });
   w.on("/scan", HTTP_GET, [&]() {
-    w.send(200, "text/plain",
-           "Scan N: " + String(NumScans) + "<br>----------------------------------<br>" + samples2string());
+    r = F("Scan N: "); r += String(NumScans);  r += F("<br>----------------------------------<br>");
+    r += samples2string();  
+    
+    w.send(200, "text/html",r);
   });
   w.on("/port", HTTP_GET, [&]() {
     if(w.hasArg("i")) {
@@ -135,8 +139,7 @@ void setup() {
 
     } else w.send(200, "text/plain", "Usage: /delay?t=n where n is 0..9");
   });
-
-  ConnectPort(VoltagePortI);
+  wifi_set_sleep_type(NONE_SLEEP_T); 
 } // setup
 
 void loop() {
@@ -146,8 +149,9 @@ void loop() {
   static avp::TimePeriod1<1000000UL / 60 / NumSamplesPerWL, micros> TP;
   static uint8_t CurPort = 0;
   static uint8_t SampleI = 0;
+  static bool GiveLoopToWiFi;
 
-  if(0 && TP.Expired()) {
+  if(TP.Expired() && (GiveLoopToWiFi = !GiveLoopToWiFi)) {
     ConnectPort(CurPort);
     uint16_t Current = analogRead(ANALOG_PIN);
     ConnectPort(VoltagePortI);
