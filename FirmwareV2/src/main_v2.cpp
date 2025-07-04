@@ -69,10 +69,6 @@ static struct {
 
 static uint32_t NumScans;
 
-// evidently ADC (analogRead) is severely interfering with WiFi, aspecially if called too often
-// so let's try not to call it continuosly, but NumSamplesPerWL times per Wave Length
-constexpr uint32_t NumSamplesPerWL = 8;
-
 /**
 samples samples over one 60 Hz Wave alternatively from CurPort
 port and from VoltagePort and then accumulates them into Power[CurPort] and
@@ -81,10 +77,12 @@ NumSamples[NUM_ports] and moves CurPort to the next port
 static inline void sample_port_and_go_to_next() {} // sample_port_and_go_to_next
 
 static const String &samples2string() {
-  static String s; s.reserve(512); s = ""; // reserve buffer for response to avoid dynamic memory allocation
+  static String s;
+  s.reserve(512);
+  s = ""; // reserve buffer for response to avoid dynamic memory allocation
   for(uint8_t CurPort = 0; CurPort < NUM_ports; ++CurPort) {
     auto &I = Integral[CurPort];
-    float Power = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples / NumSamplesPerWL;
+    float Power = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
     s += String(Power) + "<br>";
     I.Power = I.Current = I.Voltage = 0.;
     I.NumSamples = 0;
@@ -99,59 +97,55 @@ void setup() {
   r.reserve(2048);
 
   SetPins();
-  delay(3000);
 
   auto Opts = ESP_board_sync_server::Default();
 
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
   Opts.Version = "5.00";
-  Opts.AddUsage = F("<li> read - returns <em>\"Voltage Current Power Energy </li>");
+  Opts.AddUsage = F("<li> read - returns column of power value for each port</li>"
+                    "<li> scan - returns all samples collected so far</li>"
+                    "<li> port?i=n - reads port n and returns its value</li>");
   Opts.status_indication_func_ = ESP_board_sync_server::BlinkerFunc<LED_PIN>;
 
   a = new ESP_board_sync_server(Opts);
   a->TryToConnect(); // try to connect to WiFi
   debug_puts("Logging here...");
 
-  auto &w = a->server;
+  // auto &w = a->server;
 
-  w.on("/read", HTTP_GET, [&]() { w.send(200, "text/html", samples2string()); });
-  w.on("/scan", HTTP_GET, [&]() {
-    r = F("Scan N: "); r += String(NumScans);  r += F("<br>----------------------------------<br>");
-    r += samples2string();  
-    
-    w.send(200, "text/html",r);
+  a->on("/read", []() { a->send("text/html", samples2string()); });
+  a->on("/scan", []() {
+    a->AddToRespose("Scan N: ");
+    a->AddToRespose(NumScans);
+    a->AddToRespose(F("<br>----------------------------------<br>"));
+    a->AddToRespose(samples2string());
+
+    a->send("text/html");
   });
-  w.on("/port", HTTP_GET, [&]() {
-    if(w.hasArg("i")) {
-      auto Port = w.arg("i").toInt();
-      if(Port < 0 || Port >= NUM_ports) w.send(200, "text/plain", String(F("Wrong port number!")));
+  a->on("/port", []() {
+    if(a->server.hasArg("i")) {
+      auto Port = a->server.arg("i").toInt();
+      if(Port < 0 || Port >= NUM_ports) a->send("text/plain", F("Wrong port number!"));
       else {
         ConnectPort(Port);
-        w.send(200, "text/plain", "Port  = " + String(Port) + ", " + String(analogRead(ANALOG_PIN)));
+        a->send("text/plain", "Port  = " + String(Port) + ", " + String(analogRead(ANALOG_PIN)));
       }
-    } else w.send(200, "text/plain", "Usage: /port?i=n where n is port number");
+    } else a->send("text/plain", "Usage: /port?i=n where n is port number");
   });
-  w.on("/delay", HTTP_GET, [&]() {
-    if(w.hasArg("t")) {
-      Delay = GetDelay(w.arg("t").toInt());
-      Delay = w.arg("t").toInt();
-      w.send(200, "text/plain", "Delay is set to " + String(Delay) + " microseconds.");
-
-    } else w.send(200, "text/plain", "Usage: /delay?t=n where n is 0..9");
-  });
-  wifi_set_sleep_type(NONE_SLEEP_T); 
+  wifi_set_sleep_type(NONE_SLEEP_T);
 } // setup
 
 void loop() {
   yield();
 
   // integrating power over one 60Hz wave period
-  static avp::TimePeriod1<1000000UL / 60 / NumSamplesPerWL, micros> TP;
+  static avp::TimePeriod1<1000000UL / 60, micros> TP;
   static uint8_t CurPort = 0;
-  static uint8_t SampleI = 0;
-  static bool GiveLoopToWiFi;
+  static uint16_t Counter; //< we are counting 60 Hz WL periods. During Counter == 0
+  // we are reading one port as fast as possible, then we skip WIFI_timeRatio WLs for WiFi to do its thing
+  static constexpr uint16_t WIFI_timeRatio = 10; // ratio of WiFi time to analog read time
 
-  if(TP.Expired() && (GiveLoopToWiFi = !GiveLoopToWiFi)) {
+  if((Counter == 0) && !a->OTA_IsInProgress) {
     ConnectPort(CurPort);
     uint16_t Current = analogRead(ANALOG_PIN);
     ConnectPort(VoltagePortI);
@@ -161,12 +155,13 @@ void loop() {
     Integral[CurPort].Voltage += Voltage;
     Integral[CurPort].Current += Current;
     Integral[CurPort].NumSamples++;
-    if(++SampleI == NumSamplesPerWL) {
-      SampleI = 0;
+  } else a->loop();
+  if(TP.Expired())
+    if(Counter == 0) {
       if(++CurPort == NUM_ports) {
         CurPort = 0;
         ++NumScans;
       }
-    }
-  } else a->loop();
+      Counter = WIFI_timeRatio;
+    } else --Counter;
 } // loop
