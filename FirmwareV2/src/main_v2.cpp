@@ -80,10 +80,10 @@ static const String &samples2string() {
   static String s;
   s.reserve(512);
   s = ""; // reserve buffer for response to avoid dynamic memory allocation
-  for(uint8_t CurPort = 0; CurPort < NUM_ports; ++CurPort) {
-    auto &I = Integral[CurPort];
+  for(auto &I:Integral) {
     float Power = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
-    s += String(Power) + "<br>";
+    s += String(Power);
+    s += "<br>";
     I.Power = I.Current = I.Voltage = 0.;
     I.NumSamples = 0;
   }
@@ -93,15 +93,13 @@ static const String &samples2string() {
 void setup() {
   Serial.begin(115200);
   Serial.println();
-  static String r; // reserve buffer for responses to avoid dynamic memory allocation
-  r.reserve(2048);
-
+  
   SetPins();
 
   auto Opts = ESP_board_sync_server::Default();
 
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "5.00";
+  Opts.Version = "1.00";
   Opts.AddUsage = F("<li> read - returns column of power value for each port</li>"
                     "<li> scan - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
@@ -132,7 +130,7 @@ void setup() {
       }
     } else a->send("text/plain", "Usage: /port?i=n where n is port number");
   });
-  wifi_set_sleep_type(NONE_SLEEP_T);
+  // wifi_set_sleep_type(NONE_SLEEP_T);
 } // setup
 
 void loop() {
