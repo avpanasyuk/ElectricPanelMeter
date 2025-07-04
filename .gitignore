@@ -14,3 +14,4 @@
 /Altium/*.DXF
 /.vscode
 *.checksum
+/FirmwareV2/.vscode
