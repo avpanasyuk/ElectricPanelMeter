@@ -79,7 +79,7 @@ static inline void sample_port_and_go_to_next() {} // sample_port_and_go_to_next
 
 static const String &samples2string() {
   static String s;
-  s.reserve(512); // reserve buffer for response to avoid dynamic memory allocation
+  s.reserve(200); // reserve buffer for response to avoid dynamic memory allocation
   s = ""; 
   for(auto &I:Integral) {
     float Power = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
