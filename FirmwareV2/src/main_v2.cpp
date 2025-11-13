@@ -1,14 +1,15 @@
-#include "C_ESP/board_sync_server.h"
+
+#include <stdint.h>
+#include <stdio.h>
+#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include "C_ESP/WebServer.h"
 #include "C_General/Macros.h"
 #include "C_General/MyMath.hpp"
 #include "C_General/MyTime.hpp"
-#include <Arduino.h>
-#include <ESP8266WiFi.h>
-#include <stdint.h>
-#include <stdio.h>
 
 // where to direct debug_ output
-static ESP_board_sync_server *a;
+static std::unique_ptr<avp::WebServer> a;
 
 #define DEBUG_SERIAL Serial
 
@@ -78,8 +79,8 @@ static inline void sample_port_and_go_to_next() {} // sample_port_and_go_to_next
 
 static const String &samples2string() {
   static String s;
-  s.reserve(512);
-  s = ""; // reserve buffer for response to avoid dynamic memory allocation
+  s.reserve(512); // reserve buffer for response to avoid dynamic memory allocation
+  s = ""; 
   for(auto &I:Integral) {
     float Power = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
     s += String(Power);
@@ -96,39 +97,47 @@ void setup() {
   
   SetPins();
 
-  auto Opts = ESP_board_sync_server::Default();
+  auto Opts = avp::WebServer::DefaultOpts();
 
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
   Opts.Version = "1.00";
   Opts.AddUsage = F("<li> read - returns column of power value for each port</li>"
                     "<li> scan - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
-  Opts.status_indication_func_ = ESP_board_sync_server::BlinkerFunc<LED_PIN>;
+  Opts.status_indication_func_ = avp::WebServer::BlinkerFunc<LED_PIN>;
 
-  a = new ESP_board_sync_server(Opts);
+  a = avp::WebServer::Create(80);
   a->TryToConnect(); // try to connect to WiFi
   debug_puts("Logging here...");
 
-  // auto &w = a->server;
-
-  a->on("/read", []() { a->send("text/html", samples2string()); });
-  a->on("/scan", []() {
-    a->AddToRespose("Scan N: ");
-    a->AddToRespose(NumScans);
-    a->AddToRespose(F("<br>----------------------------------<br>"));
-    a->AddToRespose(samples2string());
-
-    a->send("text/html");
+  a->on("/read", [](avp::WebServer::Request_t *pReq) { 
+    pReq->send(avp::WebServer::HTTP::Response_t::OK, "text/html", samples2string()); 
   });
-  a->on("/port", []() {
-    if(a->server.hasArg("i")) {
-      auto Port = a->server.arg("i").toInt();
-      if(Port < 0 || Port >= NUM_ports) a->send("text/plain", F("Wrong port number!"));
+  a->on("/scan", [](avp::WebServer::Request_t *pReq) {
+    static String Resp; Resp.reserve(200);
+
+    Resp += "Scan N: ";
+    Resp += NumScans;
+    Resp += F("<br>----------------------------------<br>");
+    Resp += samples2string();
+
+    pReq->send(avp::WebServer::HTTP::Response_t::OK, "text/html", Resp);
+  });
+  a->on("/port", [](avp::WebServer::Request_t *pReq) {
+    if(pReq->hasArg("i")) {
+      auto Port = pReq->arg("i").toInt();
+      if(Port < 0 || Port >= NUM_ports) pReq->send(avp::WebServer::HTTP::Response_t::OK, "text/plain", F("Wrong port number!"));
       else {
         ConnectPort(Port);
-        a->send("text/plain", "Port  = " + String(Port) + ", " + String(analogRead(ANALOG_PIN)));
+        static String Content; Content.reserve(80); 
+        Content = "Port  = ";
+        Content += Port;
+        Content += ", ";
+        Content += analogRead(ANALOG_PIN);
+
+        pReq->send(avp::WebServer::HTTP::Response_t::OK, "text/plain", Content);
       }
-    } else a->send("text/plain", "Usage: /port?i=n where n is port number");
+    } else pReq->send(avp::WebServer::HTTP::Response_t::OK, "text/plain", F("Usage: /port?i=n where n is port number"));
   });
   // wifi_set_sleep_type(NONE_SLEEP_T);
 } // setup
