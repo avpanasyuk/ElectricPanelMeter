@@ -1,3 +1,4 @@
+#!/usr/local/bin/python2.7
 # -*- coding: utf-8 -*-
 """
 Created on Sat Feb  3 16:33:52 2018
@@ -24,7 +25,7 @@ try:
 except:
   print('Script name should be "readout_<type>.py", it is not!')
 
-server_addr = 'http://ESP_06CD4D.home/read' if type == 'main' else 'http://ESP_06D157.home/read'
+server_addr = 'http://EPM_main/read' if type == 'main' else 'http://ESP_06D157/read'
 
 with requests.Session() as s:
   while True:
@@ -40,6 +41,7 @@ with requests.Session() as s:
     close_ss = '<br><br></html>'
     t = t[t.find(open_ss) + len(open_ss):t.find(close_ss)]
     t = t.replace('<br>',',')
+    print(t)
     for c in t:
       if c not in numbers:
         print('Error: ' + t)
@@ -47,7 +49,7 @@ with requests.Session() as s:
     else:
       print(t)
       MM_YY = datetime.datetime.now().strftime('%m.%y')
-      with open('/RAIDZ2/R/ARCHIVE/POWER/PowerMonitor.v' + sys.argv[1] + '.' + MM_YY +
+      with open('/mnt/T/PowerMonitor.v' + sys.argv[1] + '.' + MM_YY +
         '.' + type + '.csv', 'a') as file:
         file.write(str(time.time()) + ',' + t + '\n') 
       
