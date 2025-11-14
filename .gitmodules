@@ -4,3 +4,12 @@
 [submodule "lib/General"]
 	path = lib/General
 	url = git@github.com:avpanasyuk/C_General.git
+[submodule "FirmwareV2/src/C_ESP"]
+	path = FirmwareV2/src/C_ESP
+	url = https://github.com/avpanasyuk/C_ESP.git
+[submodule "FirmwareV2/src/C_General"]
+	path = FirmwareV2/src/C_General
+	url = https://github.com/avpanasyuk/C_General.git
+[submodule "FirmwareV2/src/C_ARDUINO"]
+	path = FirmwareV2/src/C_ARDUINO
+	url = https://github.com/avpanasyuk/C_ARDUINO.git

@@ -1,7 +1,6 @@
 function plot_data(price, hour, Watts, conf)
-  plot(hour/24,Watts)
-  datetick('x','dd-HH:MM')
-  % set(gca,'XTickMode','auto')
+  t = datetime(hour/24,'ConvertFrom','datenum');
+  plot(t,Watts)
   xlabel('Day-Hour')
   ylabel('Watts')
   % AVP.PLOT.legend(cellstr([num2str([1:14;price].')]))  
