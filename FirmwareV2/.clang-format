@@ -1,15 +1,1 @@
-BasedOnStyle: LLVM
-ColumnLimit: 0
-IndentWidth: 2
-NamespaceIndentation: All
-AllowShortIfStatementsOnASingleLine: AllIfsAndElse 
-AllowShortLoopsOnASingleLine: true
-AllowShortBlocksOnASingleLine: true
-AllowShortFunctionsOnASingleLine: true
-IndentExternBlock: Indent
-PenaltyBreakBeforeFirstCallParameter: 100
-SpaceAfterControlStatementKeyword: false
-BreakTemplateDeclarations: Yes
-SpaceAfterTemplateKeyword: false
-
-
+src/C_General/.clang-format

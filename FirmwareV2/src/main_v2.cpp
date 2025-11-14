@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include "C_ESP/WebServer.h"
 #include "C_General/Macros.h"
 #include "C_General/MyMath.hpp"
 #include "C_General/MyTime.hpp"
+#include "C_ESP/WebServer.h"
 
 // where to direct debug_ output
 static std::unique_ptr<avp::WebServer> a;
@@ -15,8 +15,8 @@ static std::unique_ptr<avp::WebServer> a;
 
 extern "C" {
   int debug_puts(const char *s) {
-#ifdef DEBUG
     if(a != nullptr) a->AddToLog(s);
+#ifdef DEBUG
     if(DEBUG_SERIAL) {
       DEBUG_SERIAL.print(s);
       DEBUG_SERIAL.flush();
@@ -93,27 +93,32 @@ static const String &samples2string() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println();
+  delay(100);
+  Serial.println("Serial port connected!");
   
   SetPins();
 
   auto Opts = avp::WebServer::DefaultOpts();
 
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "1.00";
+  Opts.Version = "2.03";
   Opts.AddUsage = F("<li> read - returns column of power value for each port</li>"
                     "<li> scan - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
   Opts.status_indication_func_ = avp::WebServer::BlinkerFunc<LED_PIN>;
 
-  a = avp::WebServer::Create(80);
-  a->TryToConnect(); // try to connect to WiFi
+  a = avp::WebServer::Create(Opts);
+  while(!WiFi.isConnected()) {
+    Serial.print(".");
+    a->TryToConnect();
+  }
+   // try to connect to WiFi
   debug_puts("Logging here...");
 
-  a->on("/read", [](avp::WebServer::Request_t *pReq) { 
-    pReq->send(avp::WebServer::HTTP::Response_t::OK, "text/html", samples2string()); 
+  a->on("/read", [](avp::WebServer::Request_t &&rReq) { 
+    rReq.send("text/html", samples2string()); 
   });
-  a->on("/scan", [](avp::WebServer::Request_t *pReq) {
+  a->on("/scan", [](avp::WebServer::Request_t &&rReq) {
     static String Resp; Resp.reserve(200);
 
     Resp += "Scan N: ";
@@ -121,12 +126,12 @@ void setup() {
     Resp += F("<br>----------------------------------<br>");
     Resp += samples2string();
 
-    pReq->send(avp::WebServer::HTTP::Response_t::OK, "text/html", Resp);
+    rReq.send("text/html", Resp);
   });
-  a->on("/port", [](avp::WebServer::Request_t *pReq) {
-    if(pReq->hasArg("i")) {
-      auto Port = pReq->arg("i").toInt();
-      if(Port < 0 || Port >= NUM_ports) pReq->send(avp::WebServer::HTTP::Response_t::OK, "text/plain", F("Wrong port number!"));
+  a->on("/port", [](avp::WebServer::Request_t &&rReq) {
+    if(rReq.hasArg("i")) {
+      auto Port = rReq.arg("i").toInt();
+      if(Port < 0 || Port >= NUM_ports) rReq.send("text/plain", F("Wrong port number!"));
       else {
         ConnectPort(Port);
         static String Content; Content.reserve(80); 
@@ -135,12 +140,15 @@ void setup() {
         Content += ", ";
         Content += analogRead(ANALOG_PIN);
 
-        pReq->send(avp::WebServer::HTTP::Response_t::OK, "text/plain", Content);
+        rReq.send("text/plain", Content);
       }
-    } else pReq->send(avp::WebServer::HTTP::Response_t::OK, "text/plain", F("Usage: /port?i=n where n is port number"));
+    } else rReq.send("text/plain", F("Usage: /port?i=n where n is port number"));
   });
+  a->begin();
   // wifi_set_sleep_type(NONE_SLEEP_T);
 } // setup
+
+IGNORE_WARNING(-Wdangling-else)
 
 void loop() {
   yield();
@@ -148,7 +156,7 @@ void loop() {
   // integrating power over one 60Hz wave period
   static avp::TimePeriod1<1000000UL / 60, micros> TP;
   static uint8_t CurPort = 0;
-  static uint16_t Counter; //< we are counting 60 Hz WL periods. During Counter == 0
+  static uint16_t Counter; ///< we are counting 60 Hz WL periods. During Counter == 0
   // we are reading one port as fast as possible, then we skip WIFI_timeRatio WLs for WiFi to do its thing
   static constexpr uint16_t WIFI_timeRatio = 10; // ratio of WiFi time to analog read time
 
@@ -162,7 +170,7 @@ void loop() {
     Integral[CurPort].Voltage += Voltage;
     Integral[CurPort].Current += Current;
     Integral[CurPort].NumSamples++;
-  } else a->loop();
+  } else a->call_in_loop();
   if(TP.Expired())
     if(Counter == 0) {
       if(++CurPort == NUM_ports) {
