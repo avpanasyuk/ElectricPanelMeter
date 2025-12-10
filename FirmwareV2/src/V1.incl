@@ -1,6 +1,5 @@
-//////////////////////
-// WiFi Definitions //
-//////////////////////
+// This is definition for main panel meter
+
 
 // hardware information about analog switched connections
 static constexpr uint8_t NUM_ports = 14;

@@ -8,7 +8,6 @@
 #include "C_General/MyTime.hpp"
 #include "C_ESP/WebServer.h"
 
-// where to direct debug_ output
 static std::unique_ptr<avp::WebServer> a;
 
 #define DEBUG_SERIAL Serial
@@ -80,8 +79,8 @@ static inline void sample_port_and_go_to_next() {} // sample_port_and_go_to_next
 static const String &samples2string() {
   static String s;
   s.reserve(200); // reserve buffer for response to avoid dynamic memory allocation
-  s = ""; 
-  for(auto &I:Integral) {
+  s = "";
+  for(auto &I : Integral) {
     float Power = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
     s += String(Power);
     s += "<br>";
@@ -95,13 +94,13 @@ void setup() {
   Serial.begin(115200);
   delay(100);
   Serial.println("Serial port connected!");
-  
+
   SetPins();
 
   auto Opts = avp::WebServer::DefaultOpts();
 
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "2.03";
+  Opts.Version = "2.04";
   Opts.AddUsage = F("<li> read - returns column of power value for each port</li>"
                     "<li> scan - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
@@ -112,20 +111,26 @@ void setup() {
     Serial.print(".");
     a->TryToConnect();
   }
-   // try to connect to WiFi
+  // try to connect to WiFi
   debug_puts("Logging here...");
 
-  a->on("/read", [](avp::WebServer::Request_t &&rReq) { 
-    rReq.send("text/html", samples2string()); 
+  a->on("/read", [](avp::WebServer::Request_t &&rReq) {
+    static String s;
+    s.reserve(200); // reserve buffer for response to avoid dynamic memory allocation
+    s = "<html>";
+    s += samples2string();
+    s += "<br></html>";
+    rReq.send("text/html", s);
   });
   a->on("/scan", [](avp::WebServer::Request_t &&rReq) {
-    static String Resp; Resp.reserve(200);
+    static String Resp;
+    Resp.reserve(200);
 
-    Resp += "Scan N: ";
+    Resp += "<html>Scan N: ";
     Resp += NumScans;
     Resp += F("<br>----------------------------------<br>");
     Resp += samples2string();
-
+    Resp += "<br></html>";
     rReq.send("text/html", Resp);
   });
   a->on("/port", [](avp::WebServer::Request_t &&rReq) {
@@ -134,7 +139,8 @@ void setup() {
       if(Port < 0 || Port >= NUM_ports) rReq.send("text/plain", F("Wrong port number!"));
       else {
         ConnectPort(Port);
-        static String Content; Content.reserve(80); 
+        static String Content;
+        Content.reserve(80);
         Content = "Port  = ";
         Content += Port;
         Content += ", ";
@@ -148,7 +154,7 @@ void setup() {
   // wifi_set_sleep_type(NONE_SLEEP_T);
 } // setup
 
-IGNORE_WARNING(-Wdangling-else)
+IGNORE_WARNING(-Wdangling - else)
 
 void loop() {
   yield();

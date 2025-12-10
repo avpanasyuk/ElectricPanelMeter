@@ -1,7 +1,4 @@
-//////////////////////
-// WiFi Definitions //
-//////////////////////
-const char WiFiAPPSK[] = "esp54321";
+// this is definition for subpanel meter
 
 // hardware information about analog switched connections
 constexpr uint8_t PortsPer74HC4051 = 8;
