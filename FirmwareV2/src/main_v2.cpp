@@ -28,7 +28,7 @@ extern "C" {
 /////////////////////
 // Pin Definitions //
 /////////////////////
-constexpr uint8_t LED_PIN = D8; // Thing's onboard, green LED
+constexpr uint8_t LED_PIN = 16; // Thing's onboard, green LED
 constexpr int ANALOG_PIN = A0;  // The only analog pin on the Thing
 constexpr uint8_t NumCtrlLines_74HC4051 = 3;
 constexpr uint8_t Num74HC4051 = 2;
@@ -56,7 +56,7 @@ constexpr uint8_t GND_PortI = NUM_ports - 1;
 
 static inline void Set74HC4051_code(uint8_t c, uint8_t SwitchNum) {
   for(uint8_t BitI = 0; BitI < NumCtrlLines_74HC4051; BitI++)
-    digitalWrite(ControlLines[SwitchNum][BitI], (c >> BitI) & 1);
+    avp::WritePin(ControlLines[SwitchNum][BitI], (c >> BitI) & 1);
 } // Set74HC4051_code
 
 static inline bool is_past(uint32_t time_us) { return (micros() - time_us) < (1UL << 31); } // is_past
@@ -81,17 +81,19 @@ static const String &samples2string() {
   s.reserve(200); // reserve buffer for response to avoid dynamic memory allocation
   s = "";
   for(auto &I : Integral) {
-    float Power = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
-    s += String(Power);
+    if(I.NumSamples) {
+      float Power = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
+      s += String(Power);
+      I.Power = I.Current = I.Voltage = 0.;
+      I.NumSamples = 0;
+    } else s += "0.0";
     s += "<br>";
-    I.Power = I.Current = I.Voltage = 0.;
-    I.NumSamples = 0;
   }
   return (s);
 } // samples2string
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(74880);
   delay(100);
   Serial.println("Serial port connected!");
 
@@ -100,7 +102,7 @@ void setup() {
   auto Opts = avp::WebServer::DefaultOpts();
 
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "2.10";
+  Opts.Version = "2.11";
   Opts.AddUsage = F("<li> read - returns column of power value for each port</li>"
                     "<li> scan - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
@@ -154,7 +156,9 @@ void setup() {
   // wifi_set_sleep_type(NONE_SLEEP_T);
 } // setup
 
-IGNORE_WARNING(-Wdangling - else)
+// clang-format off
+IGNORE_WARNING(-Wdangling-else)
+// clang-format on
 
 void loop() {
   yield();

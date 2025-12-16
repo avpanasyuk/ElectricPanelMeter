@@ -15,15 +15,15 @@ static void SetPins() {
   }
 
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, 0);
+  avp::ClearPin<LED_PIN>();
 } // SetPins
 
 static inline void ConnectPort(uint8_t port) {
   uint8_t SwitchNum = port / PortsPer74HC4051;
   port = port % PortsPer74HC4051;
-  digitalWrite(Disable74HC4051_port[1 - SwitchNum], 1); // disable other switch
+  avp::WritePin(Disable74HC4051_port[1 - SwitchNum], 1); // disable other switch
   Set74HC4051_code(port, SwitchNum);                // connect the line we want
-  digitalWrite(Disable74HC4051_port[SwitchNum], 0); // enable this switch
+  avp::WritePin(Disable74HC4051_port[SwitchNum], 0); // enable this switch
   yield();
   delayMicroseconds(Delay);
 } // ConnectPort
