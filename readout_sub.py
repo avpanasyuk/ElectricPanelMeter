@@ -25,7 +25,7 @@ try:
 except:
   print('Script name should be "readout_<type>.py", it is not!')
 
-server_addr = 'http://EPM_main/read' if type == 'main' else 'http://ESP_06D157/read'
+server_addr = 'http://EPM_main/read' if type == 'main' else 'http://EPM_sub/read'
 
 with requests.Session() as s:
   while True:
