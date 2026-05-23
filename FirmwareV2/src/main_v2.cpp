@@ -8,6 +8,7 @@
 #include "C_General/MyTime.hpp"
 #include "C_ESP/HTML_Log.hpp"
 #include "C_ESP/StaticWebServer.hpp"
+#include "C_ESP/fast_gpio.hpp"
 
 using WebSrv = avp::StaticWebServer; // 'Server' collides with ESP8266 core's global class Server
 
@@ -103,7 +104,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "2.11";
+  Opts.Version = "3.01";
   Opts.AddUsage = F("<li> read - returns column of power value for each port</li>"
                     "<li> scan - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
@@ -115,7 +116,8 @@ void setup() {
     s += samples2string();
     s += "<br></html>";
     WebSrv::send("text/html", s);
-  });
+    avp::TogglePin<LED_PIN>();
+ });
   WebSrv::on("/scan", []() {
     static String Resp;
     Resp.reserve(200);
@@ -126,7 +128,7 @@ void setup() {
     Resp += samples2string();
     Resp += "<br></html>";
     WebSrv::send("text/html", Resp);
-  });
+   });
   WebSrv::on("/port", []() {
     if(WebSrv::s.hasArg("i")) {
       auto Port = WebSrv::s.arg("i").toInt();

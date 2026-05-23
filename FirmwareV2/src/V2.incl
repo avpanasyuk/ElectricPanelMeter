@@ -15,7 +15,7 @@ static void SetPins() {
   }
 
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, 0);
+  avp::ClearPin<LED_PIN>();
 } // SetPins
 
 static inline void ConnectPort(uint8_t port) {
