@@ -6,15 +6,16 @@
 #include "C_General/Macros.h"
 #include "C_General/MyMath.hpp"
 #include "C_General/MyTime.hpp"
-#include "C_ESP/WebServer.h"
+#include "C_ESP/HTML_Log.hpp"
+#include "C_ESP/StaticWebServer.hpp"
 
-static std::unique_ptr<avp::WebServer> a;
+using WebSrv = avp::StaticWebServer; // 'Server' collides with ESP8266 core's global class Server
 
 #define DEBUG_SERIAL Serial
 
 extern "C" {
   int debug_puts(const char *s) {
-    if(a != nullptr) a->AddToLog(s);
+    avp::HTML_Log::Add(s);
 #ifdef DEBUG
     if(DEBUG_SERIAL) {
       DEBUG_SERIAL.print(s);
@@ -97,46 +98,39 @@ void setup() {
 
   SetPins();
 
-  auto Opts = avp::WebServer::DefaultOpts();
+  // tell the connection-status blinker which pin to drive (default Blinken in DefaultOpts())
+  avp::StaticWiFi_Conn::LED_pin = LED_PIN;
 
+  auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "2.10";
+  Opts.Version = "2.11";
   Opts.AddUsage = F("<li> read - returns column of power value for each port</li>"
                     "<li> scan - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
-  Opts.status_indication_func_ = avp::WebServer::BlinkerFunc<LED_PIN>;
 
-  a = avp::WebServer::Create(Opts);
-  while(!WiFi.isConnected()) {
-    Serial.print(".");
-    a->TryToConnect();
-  }
-  // try to connect to WiFi
-  debug_puts("Logging here...");
-
-  a->on("/read", [](avp::WebServer::Request_t &&rReq) {
+  WebSrv::on("/read", []() {
     static String s;
     s.reserve(200); // reserve buffer for response to avoid dynamic memory allocation
     s = "<html>";
     s += samples2string();
     s += "<br></html>";
-    rReq.send("text/html", s);
+    WebSrv::send("text/html", s);
   });
-  a->on("/scan", [](avp::WebServer::Request_t &&rReq) {
+  WebSrv::on("/scan", []() {
     static String Resp;
     Resp.reserve(200);
 
-    Resp += "<html>Scan N: ";
+    Resp = "<html>Scan N: ";
     Resp += NumScans;
     Resp += F("<br>----------------------------------<br>");
     Resp += samples2string();
     Resp += "<br></html>";
-    rReq.send("text/html", Resp);
+    WebSrv::send("text/html", Resp);
   });
-  a->on("/port", [](avp::WebServer::Request_t &&rReq) {
-    if(rReq.hasArg("i")) {
-      auto Port = rReq.arg("i").toInt();
-      if(Port < 0 || Port >= NUM_ports) rReq.send("text/plain", F("Wrong port number!"));
+  WebSrv::on("/port", []() {
+    if(WebSrv::s.hasArg("i")) {
+      auto Port = WebSrv::s.arg("i").toInt();
+      if(Port < 0 || Port >= NUM_ports) WebSrv::send("text/plain", F("Wrong port number!"));
       else {
         ConnectPort(Port);
         static String Content;
@@ -146,15 +140,14 @@ void setup() {
         Content += ", ";
         Content += analogRead(ANALOG_PIN);
 
-        rReq.send("text/plain", Content);
+        WebSrv::send("text/plain", Content);
       }
-    } else rReq.send("text/plain", F("Usage: /port?i=n where n is port number"));
+    } else WebSrv::send("text/plain", F("Usage: /port?i=n where n is port number"));
   });
-  a->begin();
-  // wifi_set_sleep_type(NONE_SLEEP_T);
-} // setup
 
-IGNORE_WARNING(-Wdangling - else)
+  WebSrv::begin(Opts); // sets up WiFi (state machine), OTA, default handlers, then s.begin()
+  debug_puts("Logging here...");
+} // setup
 
 void loop() {
   yield();
@@ -166,7 +159,7 @@ void loop() {
   // we are reading one port as fast as possible, then we skip WIFI_timeRatio WLs for WiFi to do its thing
   static constexpr uint16_t WIFI_timeRatio = 10; // ratio of WiFi time to analog read time
 
-  if((Counter == 0) && !a->OTA_IsInProgress) {
+  if((Counter == 0) && !WebSrv::OTA_IsInProgress) {
     ConnectPort(CurPort);
     uint16_t Current = analogRead(ANALOG_PIN);
     ConnectPort(VoltagePortI);
@@ -176,8 +169,8 @@ void loop() {
     Integral[CurPort].Voltage += Voltage;
     Integral[CurPort].Current += Current;
     Integral[CurPort].NumSamples++;
-  } else a->call_in_loop();
-  if(TP.Expired())
+  } else WebSrv::call_in_loop();
+  if(TP.Expired()) {
     if(Counter == 0) {
       if(++CurPort == NUM_ports) {
         CurPort = 0;
@@ -185,4 +178,5 @@ void loop() {
       }
       Counter = WIFI_timeRatio;
     } else --Counter;
+  }
 } // loop
