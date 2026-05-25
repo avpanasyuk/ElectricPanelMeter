@@ -104,9 +104,9 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "3.02";
-  Opts.AddUsage = F("<li> read - returns column of power value for each port</li>"
-                    "<li> scan - returns all samples collected so far</li>"
+  Opts.Version = "3.03";
+  Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
+                    "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
 
   WebSrv::on("/read", []() {
