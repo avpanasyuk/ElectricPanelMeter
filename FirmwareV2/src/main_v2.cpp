@@ -125,14 +125,35 @@ static const String &samples2csv_and_reset() {
 // Resolve "bsd" the same way CaliperOnESP03 does: try plain DNS, then .test,
 // then mDNS via madpilot. Returns IPAddress() (==0) on total failure.
 static IPAddress resolveHost(const char *bare) {
+  debug_printf("resolveHost: local=%s gw=%s dns=%s",
+               WiFi.localIP().toString().c_str(),
+               WiFi.gatewayIP().toString().c_str(),
+               WiFi.dnsIP().toString().c_str());
+
   IPAddress ip;
-  if(WiFi.hostByName(bare, ip)) return ip;
+  if(WiFi.hostByName(bare, ip)) {
+    debug_printf("resolveHost: hostByName(%s) -> %s", bare, ip.toString().c_str());
+    return ip;
+  }
+  debug_printf("resolveHost: hostByName(%s) failed", bare);
+
   String fq = String(bare) + ".test";
-  if(WiFi.hostByName(fq.c_str(), ip)) return ip;
+  if(WiFi.hostByName(fq.c_str(), ip)) {
+    debug_printf("resolveHost: hostByName(%s) -> %s", fq.c_str(), ip.toString().c_str());
+    return ip;
+  }
+  debug_printf("resolveHost: hostByName(%s) failed", fq.c_str());
+
   WiFiUDP udp;
   mDNSResolver::Resolver r(udp);
-  IPAddress res = r.search((String(bare) + ".local").c_str());
-  return (res != INADDR_NONE) ? res : IPAddress();
+  String mdnsName = String(bare) + ".local";
+  IPAddress res = r.search(mdnsName.c_str());
+  if(res != INADDR_NONE) {
+    debug_printf("resolveHost: mDNS(%s) -> %s", mdnsName.c_str(), res.toString().c_str());
+    return res;
+  }
+  debug_printf("resolveHost: mDNS(%s) failed", mdnsName.c_str());
+  return IPAddress();
 } // resolveHost
 
 // Build the rotating logfile name: PowerMonitor.v<CONF_VERSION>.<MM.YY>.<main|sub>.csv.
@@ -161,7 +182,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "4.04"; // 4.03 + diag logs on resolve failure; HTML_Log dedup ("#" for repeats)
+  Opts.Version = "4.06"; // retry layer removed (disproved); resolveHost back to single hostByName per name
   Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
                     "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
