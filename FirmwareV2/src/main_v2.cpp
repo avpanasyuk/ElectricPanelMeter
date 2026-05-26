@@ -1,6 +1,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include "C_General/Macros.h"
@@ -9,8 +10,18 @@
 #include "C_ESP/HTML_Log.hpp"
 #include "C_ESP/StaticWebServer.hpp"
 #include "C_ESP/fast_gpio.hpp"
+#include "C_ESP/RemoteLog.hpp"
 
 using WebSrv = avp::StaticWebServer; // 'Server' collides with ESP8266 core's global class Server
+using BSDLog = avp::RemoteLog<>;     // POSTs <filename>,<csv> to bsd's http_server.py
+
+#ifndef CONF_VERSION
+#define CONF_VERSION 0 // configuration-version digit; overridden per-env in platformio.ini
+#endif
+#ifndef NTP_TZ
+// US Eastern with DST. Change in platformio.ini build_flags if you're elsewhere.
+#define NTP_TZ "EST5EDT,M3.2.0/2,M11.1.0/2"
+#endif
 
 #define DEBUG_SERIAL Serial
 
@@ -92,6 +103,38 @@ static const String &samples2string() {
   return (s);
 } // samples2string
 
+// CSV-formatted twin of samples2string(); consumes+resets accumulators just like /read.
+// During the transitional period both readout_*.py polling /read AND this push are active;
+// whichever fires first gets a full interval, the other gets a near-empty one. After the
+// readout_*.py services are retired, push owns the data path cleanly.
+static const String &samples2csv_and_reset() {
+  static String s;
+  s.reserve(200);
+  s = "";
+  for(auto &I : Integral) {
+    if(s.length()) s += ",";
+    float Power = (I.NumSamples > 0) ? (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples : 0;
+    s += String(Power);
+    I.Power = I.Current = I.Voltage = 0.;
+    I.NumSamples = 0;
+  }
+  return s;
+} // samples2csv_and_reset
+
+// Build the rotating logfile name: PowerMonitor.v<CONF_VERSION>.<MM.YY>.<main|sub>.csv.
+// Matches the existing readout_main.py / readout_sub.py output naming. Returns NULL if
+// NTP hasn't synced yet (caller should skip the push and try next interval).
+static const char *current_logfile_name() {
+  static char fname[64];
+  time_t now = time(nullptr);
+  struct tm *t = localtime(&now);
+  if(t->tm_year + 1900 < 2020) return nullptr; // NTP not synced
+  const char *type = (VERSION == 1) ? "main" : "sub";
+  snprintf(fname, sizeof(fname), "PowerMonitor.v%d.%02d.%02d.%s.csv",
+           CONF_VERSION, t->tm_mon + 1, (t->tm_year + 1900) % 100, type);
+  return fname;
+} // current_logfile_name
+
 void setup() {
   Serial.begin(115200);
   delay(100);
@@ -104,7 +147,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "3.03";
+  Opts.Version = "4.00"; // major bump: device now PUSHes to bsd in addition to serving /read
   Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
                     "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
@@ -148,6 +191,14 @@ void setup() {
   });
 
   WebSrv::begin(Opts); // sets up WiFi (state machine), OTA, default handlers, then s.begin()
+
+  // NTP -- needed to construct the monthly-rotating filename for the BSD push.
+  // configTime is async; loop's push checks time(nullptr) and skips until sync lands.
+  configTime(NTP_TZ, "pool.ntp.org");
+
+  // Where to POST samples. Filename is built per-push (rolls over monthly).
+  BSDLog::begin("http://bsd:8000/");
+
   debug_puts("Logging here...");
 } // setup
 
@@ -180,5 +231,15 @@ void loop() {
       }
       Counter = WIFI_timeRatio;
     } else --Counter;
+  }
+
+  // POST a CSV row to bsd every 5 s, matching readout_*.py polling cadence.
+  // Skipped while OTA is in progress (no network competition) and while NTP
+  // hasn't synced (no valid date to build the filename).
+  static avp::TimePeriod1<5000, millis> PushTP;
+  if(PushTP.Expired() && !WebSrv::OTA_IsInProgress) {
+    if(const char *fname = current_logfile_name()) {
+      BSDLog::postf(fname, "%s", samples2csv_and_reset().c_str());
+    }
   }
 } // loop

@@ -11,17 +11,21 @@ This directory (`FirmwareV2`) is one piece of a larger project tree (`../MATLAB`
 ## Build, upload, monitor (PlatformIO)
 
 ```
-pio run                          # build default env (nodemcu)
-pio run -t upload                # flash over USB on COM13 @ 921600 (see platformio.ini)
-pio run -e espota -t upload      # OTA upload — targets host EPM_main (the [common] netname)
+pio run -e main                  # build main-panel firmware (NAME=EPM_main, VERSION=1, CONF_VERSION=0)
+pio run -e sub                   # build sub-panel  firmware (NAME=EPM_sub,  VERSION=2, CONF_VERSION=2)
+pio run -e main -t upload        # flash main-panel over USB on COM13 @ 921600
+pio run -e espota_main -t upload # OTA upload to EPM_main
+pio run -e espota_sub  -t upload # OTA upload to EPM_sub
 pio device monitor               # serial @ 115200, esp8266_exception_decoder filter on
 ```
 
 Toolchain extras worth knowing:
-- `default_envs = nodemcu`. `espota` extends `nodemcu` and only swaps upload protocol/port.
+- Two parallel envs: `main` and `sub`. Each owns its `netname` (`EPM_main`/`EPM_sub`), `VERSION` (1/2 → hardware variant include), and `CONF_VERSION` (0/2 → filename digit in the BSD push). `default_envs = main`; set `default_envs = main, sub` to build both with one `pio run`.
+- `espota_main` and `espota_sub` extend the respective variant env and only swap upload protocol/port.
 - Filesystem is `littlefs` (Wi-Fi SSID/password are persisted to `/net_auth.txt` by `StaticWiFi_Conn`, not via WiFiManager autoConnect).
-- Common build flags: `-std=gnu++17 -DDO_OTA=1 -DNO_STL=1 -DNAME="EPM_main" -DAVP_RAM_ATTR=IRAM_ATTR`. `NO_STL=1` is set by the submodule libraries — do not pull in `<vector>`, `<string>` etc.; use `String` and the in-repo containers (`avp::Vector`, `CircBuffer`, …).
-- `-DVERSION=1` (in `[env:nodemcu]`) selects the hardware variant — see "Hardware variants" below.
+- Common build flags (`[common]`): `-std=gnu++17 -DDO_OTA=1 -DNO_STL=1 -DAVP_RAM_ATTR=IRAM_ATTR -mtext-section-literals`. `NO_STL=1` is set by the submodule libraries — do not pull in `<vector>`, `<string>` etc.; use `String` and the in-repo containers (`avp::Vector`, `CircBuffer`, …).
+- `-DNAME=...`, `-DVERSION=...`, `-DCONF_VERSION=...` are defined per-variant env, not in `[common]`.
+- `monitor_dtr=0 monitor_rts=0` in `[env:nodemcu]` — without these, `pio device monitor` toggles DTR/RTS on the nodemcu reset circuit and the chip looks like it's bootlooping.
 
 There is no test runner wired up (`test/` is the default PlatformIO placeholder) and `.travis.yml` is entirely commented out.
 
@@ -32,7 +36,7 @@ There is no test runner wired up (`test/` is the default PlatformIO placeholder)
 - **V1 = main panel.** 14 channels, asymmetric wiring described by a `SwitchInput[]` table; one of the two muxes must be parked on an "open" port whenever the other is reading.
 - **V2 = subpanel.** 16 channels (2 × 8), one mux active at a time via `Disable74HC4051_port[]`. Port 0 is the voltage pickup, last port is GND.
 
-Each `.incl` defines `NUM_ports`, `ControlLines[][]`, `SetPins()`, and `ConnectPort()`. To switch hardware target, edit `-DVERSION=...` in `[env:nodemcu]`; do not duplicate the main file.
+Each `.incl` defines `NUM_ports`, `ControlLines[][]`, `SetPins()`, and `ConnectPort()`. To switch hardware target, build `pio run -e main` vs `pio run -e sub`; do not duplicate the main file.
 
 ## Power computation
 
@@ -55,6 +59,21 @@ Registered in `setup()`:
 - `GET /` and OTA endpoints are added by `avp::StaticWebServer` itself (usage page, log viewer, firmware update).
 
 `main_v2.cpp` uses `avp::StaticWebServer` (via `#include "C_ESP/StaticWebServer.hpp"`) and aliases it locally as `WebSrv` because `Server` collides with ESP8266 core's global type name.
+
+## Push to bsd (since v4.00)
+
+In addition to serving `/read` for pull, the device PUSHes a CSV row every 5 s to `http://bsd:8000/`. The filename matches the historical `readout_*.py` output naming so files appear in the same place with the same rotation:
+
+```
+PowerMonitor.v<CONF_VERSION>.<MM>.<YY>.<main|sub>.csv
+```
+
+- `CONF_VERSION` is `0` for main, `2` for sub (from `-DCONF_VERSION=...` in the env).
+- `<MM>.<YY>` is the current local month/year — the filename rolls over monthly automatically. Requires NTP, which is started in `setup()` via `configTime(NTP_TZ, "pool.ntp.org")`; default `NTP_TZ` is `EST5EDT,M3.2.0/2,M11.1.0/2`. Push skips a tick if the clock hasn't synced yet.
+- `<main|sub>` is derived from `VERSION` (1 → "main", else "sub").
+- The push uses `avp::RemoteLog::postf(filename, ...)` from C_ESP/PLUG, which calls `HTTP_POST_puts` (lives in `C_ESP/client.cpp`, already pulled in by `build_src_filter = +<*>`).
+- bsd's `http_server.py` prepends a server-side timestamp and appends to `/mnt/T/<filename>` (open mode `'a'`, so restarts don't clobber).
+- `/read` and `/scan` still work and still reset accumulators; whichever consumer (push or a pulled `/read`) fires first gets the full interval, the other gets a near-empty one. After the legacy `power_monitor` service is retired on bsd, push owns the data path cleanly.
 
 ## Submodule libraries (`src/C_*`)
 
