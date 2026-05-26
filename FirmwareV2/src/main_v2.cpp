@@ -42,7 +42,11 @@ extern "C" {
 /////////////////////
 // Pin Definitions //
 /////////////////////
-constexpr uint8_t LED_PIN = D8; // Thing's onboard, green LED
+#if VERSION == 1
+constexpr uint8_t LED_PIN = D0; // EPM_main: oldest NodeMCU has a red LED on D0 (GPIO16)
+#else
+constexpr uint8_t LED_PIN = D8; // EPM_sub: external green LED on D8
+#endif
 constexpr int ANALOG_PIN = A0;  // The only analog pin on the Thing
 constexpr uint8_t NumCtrlLines_74HC4051 = 3;
 constexpr uint8_t Num74HC4051 = 2;
@@ -182,7 +186,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "4.07"; // toggle green LED on every successful push (visual heartbeat)
+  Opts.Version = "4.08"; // V1 LED_PIN -> D0 so EPM_main's red LED blinks/toggles too
   Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
                     "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
