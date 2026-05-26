@@ -147,7 +147,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "4.00"; // major bump: device now PUSHes to bsd in addition to serving /read
+  Opts.Version = "4.02"; // 4.01 + C_ESP fix: HTTP_POST_puts drops setReuse(true); fresh TCP per call
   Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
                     "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
