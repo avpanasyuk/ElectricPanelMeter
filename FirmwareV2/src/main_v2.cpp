@@ -182,7 +182,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "4.06"; // retry layer removed (disproved); resolveHost back to single hostByName per name
+  Opts.Version = "4.07"; // toggle green LED on every successful push (visual heartbeat)
   Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
                     "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
@@ -298,6 +298,7 @@ void loop() {
   if(PushTP.Expired() && !WebSrv::OTA_IsInProgress && bsdURL.length() > 0) {
     if(const char *fname = current_logfile_name()) {
       BSDLog::postf(fname, "%s", samples2csv_and_reset().c_str());
+      avp::TogglePin<LED_PIN>(); // visual heartbeat for the push, mirrors /read
     }
   }
 } // loop
