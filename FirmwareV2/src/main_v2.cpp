@@ -4,6 +4,7 @@
 #include <time.h>
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <mDNSResolver.h>
 #include "C_General/Macros.h"
 #include "C_General/MyMath.hpp"
 #include "C_General/MyTime.hpp"
@@ -27,7 +28,7 @@ using BSDLog = avp::RemoteLog<>;     // POSTs <filename>,<csv> to bsd's http_ser
 
 extern "C" {
   int debug_puts(const char *s) {
-    avp::HTML_Log::Add(s);
+    avp::HTML_Log::Add(s, /*AddBreak=*/true); // <br> between log entries so /log is readable
 #ifdef DEBUG
     if(DEBUG_SERIAL) {
       DEBUG_SERIAL.print(s);
@@ -121,6 +122,19 @@ static const String &samples2csv_and_reset() {
   return s;
 } // samples2csv_and_reset
 
+// Resolve "bsd" the same way CaliperOnESP03 does: try plain DNS, then .test,
+// then mDNS via madpilot. Returns IPAddress() (==0) on total failure.
+static IPAddress resolveHost(const char *bare) {
+  IPAddress ip;
+  if(WiFi.hostByName(bare, ip)) return ip;
+  String fq = String(bare) + ".test";
+  if(WiFi.hostByName(fq.c_str(), ip)) return ip;
+  WiFiUDP udp;
+  mDNSResolver::Resolver r(udp);
+  IPAddress res = r.search((String(bare) + ".local").c_str());
+  return (res != INADDR_NONE) ? res : IPAddress();
+} // resolveHost
+
 // Build the rotating logfile name: PowerMonitor.v<CONF_VERSION>.<MM.YY>.<main|sub>.csv.
 // Matches the existing readout_main.py / readout_sub.py output naming. Returns NULL if
 // NTP hasn't synced yet (caller should skip the push and try next interval).
@@ -147,7 +161,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "4.02"; // 4.01 + C_ESP fix: HTTP_POST_puts drops setReuse(true); fresh TCP per call
+  Opts.Version = "4.04"; // 4.03 + diag logs on resolve failure; HTML_Log dedup ("#" for repeats)
   Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
                     "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
@@ -196,8 +210,9 @@ void setup() {
   // configTime is async; loop's push checks time(nullptr) and skips until sync lands.
   configTime(NTP_TZ, "pool.ntp.org");
 
-  // Where to POST samples. Filename is built per-push (rolls over monthly).
-  BSDLog::begin("http://bsd:8000/");
+  // Don't call BSDLog::begin yet -- StaticWiFi_Conn is async, WiFi.localIP isn't
+  // valid yet, and we need to resolve "bsd" first. loop() handles it once WiFi
+  // is up. RemoteLog::postf is a no-op while URL is unset, so no race.
 
   debug_puts("Logging here...");
 } // setup
@@ -233,11 +248,33 @@ void loop() {
     } else --Counter;
   }
 
+  // Resolve bsd's IP once after WiFi comes up (StaticWiFi_Conn is async).
+  // Cached for the run; build the URL with the IP so HTTPClient doesn't have
+  // to re-resolve "bsd" each call. Mirrors CaliperOnESP03.
+  static String bsdURL;
+  static bool firstResolveTried = false;
+  static avp::TimePeriod1<10000, millis> resolveRetry;
+  if(bsdURL.length() == 0 && WiFi.status() == WL_CONNECTED && (uint32_t)WiFi.localIP() != 0) {
+    if(!firstResolveTried || resolveRetry.Expired()) {
+      firstResolveTried = true;
+      debug_puts("Resolving bsd ...");
+      IPAddress ip = resolveHost("bsd");
+      if((uint32_t)ip != 0) {
+        bsdURL = "http://" + ip.toString() + ":8000/";
+        BSDLog::begin(bsdURL.c_str());
+        debug_printf("BSDLog -> %s", bsdURL.c_str());
+      } else {
+        debug_puts("resolveHost(bsd) returned 0 -- retrying in 10s");
+      }
+    }
+  }
+
   // POST a CSV row to bsd every 5 s, matching readout_*.py polling cadence.
   // Skipped while OTA is in progress (no network competition) and while NTP
-  // hasn't synced (no valid date to build the filename).
+  // hasn't synced (no valid date to build the filename) and while BSDLog URL
+  // hasn't been resolved yet (postf is also a no-op in that case).
   static avp::TimePeriod1<5000, millis> PushTP;
-  if(PushTP.Expired() && !WebSrv::OTA_IsInProgress) {
+  if(PushTP.Expired() && !WebSrv::OTA_IsInProgress && bsdURL.length() > 0) {
     if(const char *fname = current_logfile_name()) {
       BSDLog::postf(fname, "%s", samples2csv_and_reset().c_str());
     }
