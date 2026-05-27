@@ -182,7 +182,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "4.07"; // toggle green LED on every successful push (visual heartbeat)
+  Opts.Version = "4.21"; // WiFi modem-sleep disabled (AiMesh node drops unicast to sleeping clients)
   Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
                     "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
@@ -226,6 +226,10 @@ void setup() {
   });
 
   WebSrv::begin(Opts); // sets up WiFi (state machine), OTA, default handlers, then s.begin()
+
+  // Disable WiFi modem-sleep so the chip reliably receives unicast traffic
+  // (the AiMesh node loses unicast packets to sleeping clients).
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
 
   // NTP -- needed to construct the monthly-rotating filename for the BSD push.
   // configTime is async; loop's push checks time(nullptr) and skips until sync lands.
