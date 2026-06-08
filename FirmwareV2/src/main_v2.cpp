@@ -83,44 +83,52 @@ static struct {
 
 static uint32_t NumScans;
 
-/**
-samples samples over one 60 Hz Wave alternatively from CurPort
-port and from VoltagePort and then accumulates them into Power[CurPort] and
-NumSamples[NUM_ports] and moves CurPort to the next port
-*/
-static inline void sample_port_and_go_to_next() {} // sample_port_and_go_to_next
+// Last complete per-port power, refreshed once per finished scan by harvest_scan().
+// Both /read and the bsd push read THIS, never the live accumulators -- so the two
+// consumers (an external client polls /read in a loop while the push runs every 5s)
+// can neither steal each other's samples nor observe a half-swept scan.
+static float LastPower[NUM_ports];
 
+// Snapshot every port's average power for the scan that just finished, then clear the
+// accumulators for the next scan. The single owner of the reset. A port with no samples
+// (shouldn't happen -- every port is swept once per scan) keeps its previous value
+// instead of emitting a spurious 0 / nan.
+static void harvest_scan() {
+  for(uint8_t i = 0; i < NUM_ports; ++i) {
+    auto &I = Integral[i];
+    if(I.NumSamples > 0)
+      LastPower[i] = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
+    I.Power = I.Current = I.Voltage = 0.;
+    I.NumSamples = 0;
+  }
+} // harvest_scan
+
+// Non-destructive: formats the last harvested snapshot for /read and /scan. Safe to poll
+// in a tight loop concurrently with the bsd push -- neither touches the live accumulators.
 static const String &samples2string() {
   static String s;
   s.reserve(200); // reserve buffer for response to avoid dynamic memory allocation
   s = "";
-  for(auto &I : Integral) {
-    float Power = (I.NumSamples > 0) ? (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples : 0;
-    s += String(Power);
+  for(uint8_t i = 0; i < NUM_ports; ++i) {
+    s += String(LastPower[i]);
     s += "<br>";
-    I.Power = I.Current = I.Voltage = 0.;
-    I.NumSamples = 0;
   }
   return (s);
 } // samples2string
 
-// CSV-formatted twin of samples2string(); consumes+resets accumulators just like /read.
-// During the transitional period both readout_*.py polling /read AND this push are active;
-// whichever fires first gets a full interval, the other gets a near-empty one. After the
-// readout_*.py services are retired, push owns the data path cleanly.
-static const String &samples2csv_and_reset() {
+// CSV twin of samples2string(): same harvested snapshot, comma-separated. Also
+// non-destructive (harvest_scan owns the reset), so the /read poller and this push
+// always serialize the same complete set of values.
+static const String &samples2csv() {
   static String s;
   s.reserve(200);
   s = "";
-  for(auto &I : Integral) {
+  for(uint8_t i = 0; i < NUM_ports; ++i) {
     if(s.length()) s += ",";
-    float Power = (I.NumSamples > 0) ? (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples : 0;
-    s += String(Power);
-    I.Power = I.Current = I.Voltage = 0.;
-    I.NumSamples = 0;
+    s += String(LastPower[i]);
   }
   return s;
-} // samples2csv_and_reset
+} // samples2csv
 
 // Try hostByName(bare), then hostByName(bare.test), then madpilot mDNS for bare.local.
 static IPAddress resolveHost(const char *bare) {
@@ -159,7 +167,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "5.03"; // re-resolve bsd on a cadence; /read zero-guard; C_ESP OTA-stall watchdog
+  Opts.Version = "5.04"; // /read + push read a per-scan snapshot (no accumulator race); re-resolve bsd; OTA watchdog
   Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
                     "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
@@ -244,6 +252,7 @@ void loop() {
     if(Counter == 0) {
       if(++CurPort == NUM_ports) {
         CurPort = 0;
+        harvest_scan(); // snapshot the finished scan for /read + the bsd push
         ++NumScans;
       }
       Counter = WIFI_timeRatio;
@@ -278,7 +287,7 @@ void loop() {
   static avp::TimePeriod1<5000, millis> PushTP;
   if(PushTP.Expired() && !WebSrv::OTA_IsInProgress && bsdURL.length() > 0) {
     if(const char *fname = current_logfile_name()) {
-      BSDLog::postf(fname, "%s", samples2csv_and_reset().c_str());
+      BSDLog::postf(fname, "%s", samples2csv().c_str());
       avp::TogglePin<LED_PIN>(); // visual heartbeat for the push, mirrors /read
     }
   }
