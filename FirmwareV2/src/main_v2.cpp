@@ -95,7 +95,7 @@ static const String &samples2string() {
   s.reserve(200); // reserve buffer for response to avoid dynamic memory allocation
   s = "";
   for(auto &I : Integral) {
-    float Power = (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples;
+    float Power = (I.NumSamples > 0) ? (I.Power - I.Current * I.Voltage / I.NumSamples) / I.NumSamples : 0;
     s += String(Power);
     s += "<br>";
     I.Power = I.Current = I.Voltage = 0.;
@@ -159,7 +159,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "5.01"; // HTTP_POST_puts 1s timeout (less loop stall on failed posts)
+  Opts.Version = "5.02"; // re-resolve bsd on a cadence (no stale cached IP); /read zero-guard
   Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
                     "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
@@ -250,17 +250,24 @@ void loop() {
     } else --Counter;
   }
 
-  // Resolve bsd once. Try immediately, then every 10s on failure.
+  // Resolve bsd and keep the IP fresh. DHCP can move bsd, and a meter may run
+  // for months, so we re-resolve on a cadence (never cache the IP for the whole
+  // boot) and re-point the logger whenever the IP changes. A stale cached IP
+  // makes every 5s push fail, and the repeated failed connects eventually wedge
+  // the heap -- so the device must self-heal when bsd moves.
   static String bsdURL;
   static bool firstTry = true;
-  static avp::TimePeriod1<10000, millis> resolveRetry;
-  if(bsdURL.length() == 0 && WiFi.status() == WL_CONNECTED && (firstTry || resolveRetry.Expired())) {
+  static avp::TimePeriod1<15000, millis> resolveTO; // first try is immediate; then re-check every 15s
+  if(WiFi.status() == WL_CONNECTED && (firstTry || resolveTO.Expired())) {
     firstTry = false;
     IPAddress ip = resolveHost("bsd");
     if((uint32_t)ip != 0) {
-      bsdURL = "http://" + ip.toString() + ":8000/";
-      BSDLog::begin(bsdURL.c_str());
-      debug_printf("bsd -> %s", bsdURL.c_str());
+      String url = "http://" + ip.toString() + ":8000/";
+      if(url != bsdURL) { // first resolve, or bsd's IP changed
+        bsdURL = url;
+        BSDLog::begin(bsdURL.c_str());
+        debug_printf("bsd -> %s", bsdURL.c_str());
+      }
     }
   }
 
