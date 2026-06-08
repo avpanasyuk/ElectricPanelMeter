@@ -46,14 +46,14 @@ Each `.incl` defines `NUM_ports`, `ControlLines[][]`, `SetPins()`, and `ConnectP
 P = (ΣV·I − ΣV·ΣI / N) / N
 ```
 
-which is the real power with the DC bias subtracted (each ADC channel has its own offset, so plain ΣV·I would be wrong). After a read the accumulators are reset and `NumScans` advances.
+which is the real power with the DC bias subtracted (each ADC channel has its own offset, so plain ΣV·I would be wrong). At the end of each scan `harvest_scan()` snapshots every port's average into `LastPower[]`, resets the accumulators, and advances `NumScans`. `harvest_scan()` is the **sole** owner of the reset — `/read` and the bsd push are pure readers of `LastPower[]`, so the (concurrently polled) reader and the 5 s push never steal each other's samples or observe a half-swept scan.
 
 Sampling shares the CPU with Wi-Fi via `WIFI_timeRatio`: in every group of `1+WIFI_timeRatio` 60 Hz periods the firmware samples for one and calls `a->call_in_loop()` (WebServer + OTA housekeeping) for the rest. Sampling is also suppressed while `OTA_IsInProgress`.
 
 ## HTTP API
 
 Registered in `setup()`:
-- `GET /read` — column of per-port power values, resets accumulators.
+- `GET /read` — column of per-port power values from the last completed scan snapshot (`LastPower[]`); **non-destructive**, safe to poll in a loop.
 - `GET /scan` — same as `/read` but also reports `NumScans`.
 - `GET /port?i=N` — raw `analogRead` of port N (debug helper).
 - `GET /` and OTA endpoints are added by `avp::StaticWebServer` itself (usage page, log viewer, firmware update).
@@ -73,7 +73,7 @@ PowerMonitor.v<CONF_VERSION>.<MM>.<YY>.<main|sub>.csv
 - `<main|sub>` is derived from `VERSION` (1 → "main", else "sub").
 - The push uses `avp::RemoteLog::postf(filename, ...)` from C_ESP/PLUG, which calls `HTTP_POST_puts` (lives in `C_ESP/client.cpp`, already pulled in by `build_src_filter = +<*>`).
 - bsd's `http_server.py` prepends a server-side timestamp and appends to `/mnt/T/<filename>` (open mode `'a'`, so restarts don't clobber).
-- `/read` and `/scan` still work and still reset accumulators; whichever consumer (push or a pulled `/read`) fires first gets the full interval, the other gets a near-empty one. After the legacy `power_monitor` service is retired on bsd, push owns the data path cleanly.
+- The push serializes the same `LastPower[]` snapshot that `/read` serves, so an external client polling `/read` in a loop and the 5 s push coexist cleanly — both always see a complete, identical set of per-port values.
 
 ## Submodule libraries (`src/C_*`)
 
