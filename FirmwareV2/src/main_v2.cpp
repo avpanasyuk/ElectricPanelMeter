@@ -159,7 +159,7 @@ void setup() {
 
   auto Opts = WebSrv::DefaultOpts();
   Opts.Name = NAME; // NAME should be specified in platformio.ini, so it is in sync with upload_port in espota
-  Opts.Version = "5.02"; // re-resolve bsd on a cadence (no stale cached IP); /read zero-guard
+  Opts.Version = "5.03"; // re-resolve bsd on a cadence; /read zero-guard; C_ESP OTA-stall watchdog
   Opts.AddUsage = F("<li><a href='/read'>read</a> - returns column of power value for each port</li>"
                     "<li><a href='/scan'>scan</a> - returns all samples collected so far</li>"
                     "<li> port?i=n - reads port n and returns its value</li>");
