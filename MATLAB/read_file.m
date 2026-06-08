@@ -17,7 +17,13 @@ function [price, hour, Watts] = read_file(filename, conf)
 
   % csv file structure: first column is epoch 1970 second, second is volt
   % channel, last one is ground
-  hour = datenum(1970,1,1)*24 + m(:,1)/60/60 - 5; % last term is timezone
+  % Convert epoch seconds (col 1) to local wall-clock time, DST-aware: the
+  % America/New_York zone applies the EST(-5)/EDT(-4) switch automatically.
+  % Drop the zone to a naive datenum*24 so the downstream diff/trapz/plot all
+  % see correct local hours (a fixed -5 was an hour off for the EDT half-year).
+  tLocal = datetime(m(:,1), 'ConvertFrom', 'posixtime', 'TimeZone', 'America/New_York');
+  tLocal.TimeZone = '';
+  hour = datenum(tLocal) * 24;
   % let's mark breaks > 10 min
   breaks = unique([1;find(AVP.diff(hour) > 1/6)+1;numel(hour)+1]);
 
