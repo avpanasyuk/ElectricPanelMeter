@@ -1,22 +1,34 @@
 function [price, hour, Watts] = read_file(filename, conf)
-  %m = abs(csvread(filename,2)); % first string may be corrupted
-  % !!!!!!SOMETIMES THERE IS A SPARE CR WHICH BREAKS csvread
+  % CSV layout: column 1 is a timestamp, the rest are ADC values (col 2 = the
+  % shared voltage channel, last column = ground reference). The timestamp
+  % column appears in two formats, which may be mixed within one file:
+  %   legacy : Unix epoch seconds as a float             e.g. 1518000000.00
+  %   current: local wall-clock 'yyyy-MM-dd HH:mm:ss.SS' (bsd http_server.py)
+  % Both are normalized to epoch seconds here, then to local hours below.
 
-  fid = fopen(filename);
-  x = sscanf(fgets(fid),'%g%c',[2 Inf]); % reading the first line which may be corrupted, counting entries
-  NumVars = size(x,2);
-  A = [];
-  while ~feof(fid)
-    A = [A, fscanf(fid,'%g%c',[2 Inf])];
-    fgets(fid);
-  end
-  Nlines = fix(size(A,2)/NumVars);
+  lines = strip(readlines(filename));
+  lines = lines(strlength(lines) > 0); % drop blank/trailing lines
 
-  m = abs(reshape(A(1,1:Nlines*NumVars),NumVars,[]).');
-  fclose(fid);
+  % Keep only well-formed rows (the dominant column count); guards against a
+  % corrupted first line or a stray CR that splits a row.
+  ncommas = count(lines, ',');
+  NumVars = mode(ncommas) + 1;
+  lines = lines(ncommas == NumVars - 1);
+  parts = split(lines, ','); % N x NumVars string array
 
-  % csv file structure: first column is epoch 1970 second, second is volt
-  % channel, last one is ground
+  % Column 1 -> epoch seconds. Parse the human-readable local format first;
+  % rows that don't match it (NaT) are legacy epoch floats. The local zone is
+  % bsd's (America/New_York), so posixtime() round-trips both to the same epoch
+  % that the conversion below maps back to local wall-clock.
+  t = datetime(parts(:,1), 'InputFormat', 'yyyy-MM-dd HH:mm:ss.SS', ...
+               'TimeZone', 'America/New_York');
+  epoch = posixtime(t); % NaT -> NaN
+  legacy = isnat(t);
+  epoch(legacy) = str2double(parts(legacy, 1));
+
+  m = [epoch, abs(double(parts(:, 2:end)))]; % ADC cols: abs; unparseable -> NaN
+  m = m(~any(isnan(m), 2), :); % drop rows with any bad field
+
   % Convert epoch seconds (col 1) to local wall-clock time, DST-aware: the
   % America/New_York zone applies the EST(-5)/EDT(-4) switch automatically.
   % Drop the zone to a naive datenum*24 so the downstream diff/trapz/plot all
