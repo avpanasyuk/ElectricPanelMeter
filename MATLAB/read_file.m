@@ -16,15 +16,21 @@ function [price, hour, Watts] = read_file(filename, conf)
   lines = lines(ncommas == NumVars - 1);
   parts = split(lines, ','); % N x NumVars string array
 
-  % Column 1 -> epoch seconds. Parse the human-readable local format first;
-  % rows that don't match it (NaT) are legacy epoch floats. The local zone is
-  % bsd's (America/New_York), so posixtime() round-trips both to the same epoch
-  % that the conversion below maps back to local wall-clock.
-  t = datetime(parts(:,1), 'InputFormat', 'yyyy-MM-dd HH:mm:ss.SS', ...
-               'TimeZone', 'America/New_York');
-  epoch = posixtime(t); % NaT -> NaN
-  legacy = isnat(t);
-  epoch(legacy) = str2double(parts(legacy, 1));
+  % Column 1 -> epoch seconds. The human-readable format contains '-' (date
+  % separators); legacy epoch floats don't, so split on that and parse each
+  % group its own way. (datetime() errors, rather than returning NaT, when no
+  % element matches its InputFormat, so it can't be applied to the epoch rows.)
+  % The local zone is bsd's (America/New_York), so posixtime() round-trips the
+  % human-readable rows to the same epoch the conversion below maps back from.
+  ts = parts(:,1);
+  human = contains(ts, '-');
+  epoch = nan(numel(ts), 1);
+  epoch(~human) = str2double(ts(~human));
+  if any(human)
+    t = datetime(ts(human), 'InputFormat', 'yyyy-MM-dd HH:mm:ss.SS', ...
+                 'TimeZone', 'America/New_York');
+    epoch(human) = posixtime(t);
+  end
 
   m = [epoch, abs(double(parts(:, 2:end)))]; % ADC cols: abs; unparseable -> NaN
   m = m(~any(isnan(m), 2), :); % drop rows with any bad field
