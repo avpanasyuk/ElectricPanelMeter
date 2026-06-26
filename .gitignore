@@ -16,3 +16,4 @@
 *.checksum
 /FirmwareV2/.vscode
 /FirmwareV2/firmware.map
+.claude/

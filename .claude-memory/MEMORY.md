@@ -1,0 +1,1 @@
+- [Power log data flow](power-log-data-flow.md) — bsd `/mnt/T` (`//bsd/USB_FLASH`) is the live push buffer; finished months move monthly to `/POOL/ARCHIVE/POWER` (`//bsd/ARCHIVE/POWER`), which is where `show1.m` reads — do not repoint it at the live buffer.
