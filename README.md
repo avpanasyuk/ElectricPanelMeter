@@ -19,8 +19,9 @@ MATLAB and Python tooling for readout and analysis.
   See `FirmwareV2/CLAUDE.md` for build and agent notes.
 - **`Firmware/`** — the original (V1) firmware, kept for reference.
 - **`MATLAB/`** — analysis code; vendors `github.com/avpanasyuk/MATLAB` at
-  `MATLAB/AVP_LIB`.
-- **`readout_main.py` / `readout_sub.py`** — Python readout of the logged data.
+  `MATLAB/AVP_LIB`. Logging is push-based: since firmware v4.00 the device POSTs
+  its CSV rows straight to the home server's `http_server.py`, so no host-side
+  polling script is needed.
 - **`conf_*.m`, `*.csv`, `*.xls`** — configuration and recorded data.
 
 ## Building the firmware
