@@ -2,7 +2,7 @@ function month_by_month(PanelID)
   % plot all data month by month
   global PROJECT_DIR
   
-  cd('R:\ARCHIVE\POWER');
+  cd('//bsd/ARCHIVE/ESP_LOGS/');
   FileNameTemp = ['PowerMonitor.v*.*.*.' PanelID '.csv'];
   f = dir(FileNameTemp);
   for fI = 1:numel(f)

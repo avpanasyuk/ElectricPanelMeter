@@ -1,13 +1,10 @@
 function show1(IsSub,month,year,indexes)
   %> @param indexes - indexes of circuits to show
   global PROJECT_DIR
-	% Completed monthly logs live here. The device pushes live rows to bsd
-  % /mnt/T (SMB share //bsd/USB_FLASH); a monthly job moves each FINISHED
-  % month's file into /POOL/ARCHIVE/POWER (this share). show1 plots finished
-  % months, so it reads the archive -- NOT /mnt/T. The in-progress current
-  % month is still only in /mnt/T (//bsd/USB_FLASH) until it is moved at month
-  % end; read it there directly if you need to look at the current month.
-  cd('//bsd/ARCHIVE/POWER/')
+  % bsd's http_server writes every ESP log CSV straight into this share, so
+  % the in-progress current month is readable here alongside the finished
+  % ones. There is no second location and no monthly move.
+  cd('//bsd/ARCHIVE/ESP_LOGS/')
   if IsSub, PanelID = 'sub'; else PanelID = 'main'; end
   FileNameTemp = sprintf(['PowerMonitor.v*.%02d.%02d.' PanelID '.csv'],month,year);
   f = dir(FileNameTemp);
