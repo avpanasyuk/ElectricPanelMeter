@@ -30,9 +30,32 @@ ground reference, and if the utility neutral is compromised the pipe may carry t
 neighbourhood's return, so breaking it can energise the plumbing. DSH's
 "remove the bond jumper" test applies to a *load-side* bond only, never here.
 
-⚠ **Watts badly understate this channel.** 3.25 A against the ~0.85 A in-phase
-implied by ~102 W is a power factor near 0.26. Do not use W as a current proxy on
-port 9 or compare it to load channels.
+⭐ **The SHARE, not the watts, is the number to watch** — and it is
+calibration-proof, so it is the only quantity here comparable across firmware
+epochs. Regressing port 9 W on the service-neutral unbalance
+`|Main Red − Main Black|` W gives the fraction of neutral current diverted onto the
+water main (`scripts/port9_divider.py`). **A rising share is the service-neutral
+degradation signal, and it needs no clamp meter.**
+
+| month | slope | r | median p9 |
+|---|---|---|---|
+| 2022-06 | 0.312 | 0.777 | 125 W |
+| 2023-06 | 0.300 | 0.727 | 126 W |
+| 2024-08 | 0.067 | 0.128 | 434 W |
+| 2026-02 | −0.001 | −0.028 | 13.8 W |
+| 2026-08 | 0.187 | 0.404 | 64.8 W |
+| 2026-09 | 0.360 | 0.498 | 84.4 W |
+
+That collapse and return **dates the CT coming off (during 2024) and going back on
+(between 2026-07 and 2026-08)** — the channel is reading the GEC again now, so no
+re-seating is needed. ⚠ 2026-09's 0.360 against 0.30–0.31 in 2022–23 is the
+direction that says neutral impedance has risen, but r is 0.50 against 0.78 then
+and n is a few days: **not a claim, a thing to re-measure once coverage builds.**
+⚠ 2024-08 is unexplained — slope collapsed to 0.067 while the level *rose* to a
+434 W median, and a pure coupling change would scale both together.
+
+⚠ Watts on this channel are not a calibrated current: r ≈ 0.5 means the coupling is
+partial. Do not compare port 9 watts to load channels.
 
 **The condition is chronic, not new.** Monthly medians, reproduced from the raw
 archive: 61.7 W (2018-12) rising to 434.6 (2024-08) and 398.1 (2024-09); 0.0 in
