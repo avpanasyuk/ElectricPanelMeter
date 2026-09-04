@@ -221,14 +221,37 @@ mode in this panel, not a speculative one.
 Open questions for a panel visit: what port 10's CT is actually clamped on, why it
 went dead in 2024-10, and whether the attic air handler is metered at all.
 
-## `38 Vova` (port 11) — disturbed by the same June–July 2024 work
+## ⛔ `38 Vova` (port 11) — NOT disturbed by the 2024 work. It swings on its own.
 
-Corrected monthly means: 12–64 W through 2023 (variable, never a steady baseline),
-46.6 / 64.9 / 58.3 / 45.8 W in 2024-02…05, then **12.6 (2024-08), 2.0 (2024-09)** and
-~2–8 W ever after. The break is across the 2024-06/07 panel gap, so that CT was
-disturbed or its circuit re-routed along with port 9's. Neighbouring `24` and `26` are
-flat across the same window (12 W and 111–186 W either side), so the disturbance was
-local to those two CTs, not board-wide.
+Two sessions asserted a 2024 collapse here and both were wrong, because both read one
+high run as a baseline. The full corrected series (monthly means, W, whole archive)
+settles it:
+
+| span | port 11 |
+|---|---|
+| 2018-12 … 2019-08 | 8.5–13.7 |
+| 2019-09 … 2020-05 | 18.9 → 34.4, rising |
+| 2020-06 … 2021-07 | 36.4–**107.4** |
+| 2021-08 | **7.7** — the sharpest step this channel has ever made |
+| 2021-10 … 2023-11 | 12–47, variable |
+| 2023-12 … 2024-05 | 45.8–64.9 |
+| 2024-08 … 2026-01 | 2.0–12.6, except **34.7** in 2025-04 |
+| 2026-02, -03, -06 | **38.9, 48.0, 28.2** |
+
+⇒ **There is no discontinuity at the June–July 2024 panel work.** The channel's monthly
+mean has ranged 2–107 W for its whole life and returns to 28–48 W repeatedly after 2024.
+Its one genuinely sharp, unexplained step is **2021-07 → 2021-08, 107.4 → 7.7 W** — which
+nobody has looked at, and which is far larger than anything in 2024.
+
+⚠ **Its low months are not measurements.** 2–12 W sits inside the ±20 W per-channel
+residual (see [[read-file-ground-subtraction-sign]]), so "port 11 was quiet" and "port 11
+read nothing distinguishable from zero" are the same statement. Only the 28–107 W months
+are real. The same trap caught channel `24`, which appears to step 12 → 26 W at the
+2025-12 flash: that is its residual tracking the GND column's 300 → 550 step, not a load
+change — the feeders moved only ×1.105 across the same boundary.
+
+⇒ The June–July 2024 work disturbed **port 9 only**. `24` and `26` are flat across it
+(12 W, and 111–186 W either side), and so, correctly read, is port 11.
 
 ## `40 Lida` (port 12) — worked for three years, then stopped
 

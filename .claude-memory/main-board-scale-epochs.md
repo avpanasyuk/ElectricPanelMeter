@@ -69,11 +69,12 @@ power outlet, and "maybe moved ground wire CT"** — his words, "it should not h
 changed anything else." Main is dark through 2024-06/07 because he powered the board
 down to work.
 
-That accounts for the GND step (294.8 → 329.3 → 308.2 by 2024-10), port 9 leaving the
-GEC, and the collapse of port 11 — the archive could never have supplied any of it.
-**The feeders did not move**: HOUSE_POWER's bill-plus-PV chain reads ~0.914 either side,
-so the board's scale is unchanged. CT and wiring work, not calibration. Treat
-**2024-06-01 … 2024-08-01 as a hard discontinuity for ports 9 and 11 only.**
+That accounts for the GND step (294.8 → 329.3 → 308.2 by 2024-10) and port 9 leaving the
+GEC — the archive could never have supplied either. **The feeders did not move**:
+HOUSE_POWER's bill-plus-PV chain reads ~0.914 either side, so the board's scale is
+unchanged. CT and wiring work, not calibration. Treat **2024-06-01 … 2024-08-01 as a
+hard discontinuity for port 9 alone** — port 11 was wrongly added to it by both sessions
+and does not belong (see [[main-panel-channels-needing-a-bench-check]]).
 
 ⛔ **The lesson, worth more than the answer: when a step lands in a window where the
 meter also went dark, ASK HIM FIRST.** Those two coincide precisely because he powers the
