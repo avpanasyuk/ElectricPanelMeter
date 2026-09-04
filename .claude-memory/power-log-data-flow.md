@@ -21,6 +21,9 @@ at 2026-09-02 21:11 — it answers reads with pre-move data and **no error**, so
 anyone following the old note gets stale rows with no clue anything is wrong.
 
 **How to apply:** every reader → `//bsd/ARCHIVE/ESP_LOGS`. Never `/mnt/T` or
-`//bsd/USB_FLASH`. Column 1 of these logs is dual-format (legacy Unix epoch +
-`yyyy-MM-dd HH:mm:ss.SS` since 2026-06-23), handled by `read_file.m`.
+`//bsd/USB_FLASH`. One file per month, no chunks — `ESP_LOGS_PRE_MERGE/` holds
+duplicate rows and is deliberately outside the sink dir, so never glob the tree
+recursively. Column 1 is dual-format (legacy Unix epoch +
+`yyyy-MM-dd HH:mm:ss.SS` since 2026-06-23) and both can appear in one file,
+handled by `read_file.m`.
 See [[esp-log-sink-rotation-truncates-months]] before trusting a month's row count.
