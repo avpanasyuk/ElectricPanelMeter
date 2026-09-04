@@ -208,8 +208,10 @@ See [[read-file-ground-subtraction-sign]].
 Port 10 is labelled `28 Air handler attic`. The attic air handler runs
 continuously and a blower is hundreds of watts, but the channel read **3–20 W from
 2018-12 to 2024-09** and then **exactly 0.0 from 2024-10 on** (raw stepped ~360 →
-201 against a ~308 GND reference; it now sits below the reference, which floors the
-watts at zero). The user's reading: **3–20 W is far too low for that air handler,
+201 against a ~308 GND reference; it now sits below the reference, which floored the
+watts at zero under the old estimator). ⭐ **It is dead, confirmed by modulation**: its
+hour-of-day swing is 1.3× the GND column's own, i.e. it tracks the reference and carries
+no load at all. That also rules out reading its +6.7 W since 2025-12 as an A/C response. The user's reading: **3–20 W is far too low for that air handler,
 so the channel is probably mislabelled** — it is measuring some other small load,
 which then stopped in 2024-10.
 
@@ -243,12 +245,14 @@ mean has ranged 2–107 W for its whole life and returns to 28–48 W repeatedly
 Its one genuinely sharp, unexplained step is **2021-07 → 2021-08, 107.4 → 7.7 W** — which
 nobody has looked at, and which is far larger than anything in 2024.
 
-⚠ **Its low months are not measurements.** 2–12 W sits inside the ±20 W per-channel
-residual (see [[read-file-ground-subtraction-sign]]), so "port 11 was quiet" and "port 11
-read nothing distinguishable from zero" are the same statement. Only the 28–107 W months
-are real. The same trap caught channel `24`, which appears to step 12 → 26 W at the
-2025-12 flash: that is its residual tracking the GND column's 300 → 550 step, not a load
-change — the feeders moved only ×1.105 across the same boundary.
+⚠ **Its low months are not level measurements.** 2–12 W sits inside the ±20 W
+per-channel residual, so "port 11 was quiet" and "port 11 read nothing distinguishable
+from zero" are the same statement about its LEVEL. The same trap makes channel `24`
+appear to step 12 → 26 W at the 2025-12 flash: 270 counts against the GND column's own
+250-count step, i.e. the reference, not the circuit — the feeders moved only ×1.105 there.
+**Test the modulation instead**: `24` swings 17× the GND column's own diurnal swing and
+port 11 19×, so both carry real load regardless of where their levels sit. The rule and
+the measured yardstick are in [[read-file-ground-subtraction-sign]].
 
 ⇒ The June–July 2024 work disturbed **port 9 only**. `24` and `26` are flat across it
 (12 W, and 111–186 W either side), and so, correctly read, is port 11.

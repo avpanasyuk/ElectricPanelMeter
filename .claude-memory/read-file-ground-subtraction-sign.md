@@ -46,8 +46,29 @@ signed subtraction correct.
 **Residual floor after the fix: ±20 W per channel, not zero.** `28 Air handler attic` and
 `40 Lida` average *below* GND (363 and 191 counts vs 505), so the offset is not identical
 across mux inputs. Their post-fix 14.7 W / 16.4 W is the magnitude of that residual, not
-power. Treat anything under ~25 W on a branch channel as indistinguishable from zero —
-and note this independently confirms `28 Air handler attic` reads nothing.
+power.
+
+⛔ **But test the MODULATION, not the level — a residual is constant, so it cannot make a
+diurnal shape.** "Under 25 W means nothing" is too blunt and throws away real load. The
+GND column's own hour-of-day swing is the yardstick: **14.2 counts** over 2026-03
+(357950 rows). Against it, same month:
+
+| channel | swing | × GND | W range |
+|---|---|---|---|
+| `40 Lida` | 615.6 | **43×** | 11.5 → 43.5 |
+| `38 Vova` | 273.9 | **19×** | 43.4 → 57.6 |
+| `24` | 238.7 | **17×** | 13.0 → 25.4 |
+| `Grounding strip` | 80.6 | 5.7× | 9.9 → 14.1 |
+| `28 Air handler attic` | 18.8 | **1.3×** | −18.9 → −17.0 |
+
+⇒ `40 Lida` and `24` carry real diurnal load of tens of watts even though their LEVELS sit
+in the residual band. ⇒ `28 Air handler attic` tracks the reference and does not modulate
+at all — which confirms it reads nothing far more strongly than the level argument did,
+and rules out the "responds slightly to A/C" reading of its +6.7 W since 2025-12.
+
+**The rule: below ~25 W a branch channel's LEVEL is offset; its MODULATION is real when it
+is ≳10× the GND column's own swing in the same month.** Compute the yardstick per month —
+it scales with the offset, which stepped at the 2025-12 flash.
 
 **How to apply:** `read_file.m` now subtracts GND signed, applies one fixed per-channel
 sign taken from the whole-record mean, and no longer clamps at zero — so reverse flow
