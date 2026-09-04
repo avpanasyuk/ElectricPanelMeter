@@ -23,9 +23,15 @@ The only stretch in eight years where both units were near-complete is
 **2025-07-03 → 2025-11-15, EPM_main posted ~975,600 rows containing a timestamp
 and one trailing comma — no payload**, at the normal 5 s cadence. It recovered
 2025-12-10 15:22:23, mixed with short rows for ~24 minutes around that point.
-Today's v5.04 cannot produce that shape (`harvest_scan` writes `LastPower[i]`
-only when `NumSamples > 0`, and `samples2csv` always emits `NUM_ports` fields),
-so diagnosis needs the firmware as of those dates, not the current source.
+**Diagnosed and long since fixed.** Commit `4787751` (2025-07-02, "a lot of time
+is wasted on String reallocations") made `samples2string()` return a reference to
+a static buffer that `/read` passed straight into `send()`; `5e500c6`
+(2025-12-10 17:07, "was not formatting /read string properly") fixed it by
+assembling into its own buffer. In 2025 the rows came from a host-side poller
+reading `/read`, so a malformed response wrote a timestamp and an empty field.
+Both boundaries bracket the commits with flash-then-commit ordering (data
+recovered 2025-12-10 15:22, commit 17:07). Nothing to look for in current
+firmware; treat 2025-07-03 → 2025-11-15 as a known-bad window and exclude it.
 
 **Why it matters beyond the data:** the device was up, on WiFi, posting on
 schedule; file mtime, growth rate and rows-per-day were all nominal for 4.5

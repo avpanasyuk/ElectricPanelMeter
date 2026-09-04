@@ -23,3 +23,5 @@
 /FirmwareV2/secrets.ini
 # PlatformIO build tree (relocated to D:/WORK, but a stale one can reappear)
 /FirmwareV2/.pio/
+# Handoff notes are transient per-session state, Dropbox-synced already
+.claude-memory/session-handoff-*.md

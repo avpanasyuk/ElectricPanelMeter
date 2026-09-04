@@ -1,6 +1,6 @@
 ---
 name: esp-log-sink-rotation-truncates-months
-description: "The 10 MiB rotation that overwrote its single .1 destroyed most of Jun-Aug 2026; fixed in C_ESP, staged on bsd, awaiting an http_server restart"
+description: "The 10 MiB rotation that overwrote its single .1 destroyed most of Jun-Aug 2026; fixed in C_ESP and deployed, months rebuilt to one file each"
 metadata:
   node_type: memory
   type: project
@@ -12,16 +12,17 @@ last two chunks of a month survived. Roughly the 1st ~10:00 to the 23rd–26th o
 2026-06, -07 and -08 is gone on both units — unrecoverable (written to `/mnt/T`,
 UFS on a USB stick, outside every snapshot).
 
-**Fixed in C_ESP `development` (9fc4625), and already on bsd's clone** at
-`~panasyuk/GIT_REPS/LIBS/C/ESP` — pushing to `HOME` updates that working tree
-(`receive.denyCurrentBranch=updateInstead`). **The running process still has the
-old code: it needs an `http_server` restart, which drops in-flight POSTs.**
-A filename carrying the month (`--no-rotate-pattern`, `MONTHLY_NAME_RE`) is
-exempt from size rotation, so the power logs stay one file per month; other names
-keep the cap but the over-size file is renamed to `<file>.<YYYYmmdd-HHMMSS>` and
-kept. Disk protection is `--max-rows-per-min` plus a `--dir-quota-bytes` alert,
-neither of which deletes. `--alert-email` defaults to None — set it on the
-service line or the alerts only print. `test_http_server.py` sits beside it.
+**Fixed in C_ESP `development` (9fc4625) and running on bsd.** A filename carrying
+the month (`--no-rotate-pattern`, `MONTHLY_NAME_RE`) is exempt from size rotation,
+so the power logs stay one file per month; other names keep the cap but the
+over-size file is renamed to `<file>.<YYYYmmdd-HHMMSS>` and kept. Disk protection
+is `--max-rows-per-min` plus a `--dir-quota-bytes` alert, neither of which deletes.
+`test_http_server.py` sits beside it — run it after any change there.
+
+Note for future pushes: `~panasyuk/GIT_REPS/LIBS/C/ESP` on bsd is a working clone
+with `receive.denyCurrentBranch=updateInstead`, so **pushing C_ESP to `HOME`
+updates the file the sink runs**. It takes effect only on the next `http_server`
+restart, which drops in-flight POSTs and is the user's call.
 
 **Repaired 2026-09-04:** 42,164 rows recovered from ZFS snapshots (the first
 ~10 h of each month, from the retired monthly rsync's copies), then each month
