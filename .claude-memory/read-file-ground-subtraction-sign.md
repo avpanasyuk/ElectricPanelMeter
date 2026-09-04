@@ -69,6 +69,18 @@ and rules out the "responds slightly to A/C" reading of its +6.7 W since 2025-12
 is ≳10× the GND column's own swing in the same month.** Compute the yardstick per month —
 it scales with the offset, which stepped at the 2025-12 flash.
 
+⛔ **Before any correlation or shape statistic on a low channel, check `r(Δchannel, Δgnd)`
+in RAW SIGNED COUNTS.** A channel whose CT reads nothing does not go quiet — it becomes
+the GND column, and then every statistic derived from `channel − gnd` correlates with
+every other channel through the shared `gnd` term, with no load anywhere. It looks exactly
+like a real coupling. Port 9 hits 0.89–0.996 across 2024-10…2025-06 and manufactured a
+convincing "black leg" signature there; ≈0 is the healthy value, and every month
+2018-12…2024-09 sits at ≈0. **A high r means the channel is inadmissible, not that it is
+coupled to something.** Since a reversed CT's watts carry `+gnd` and a normal one's carry
+`−gnd`, the artefact always looks like "the reversed channels respond and the others
+anti-respond" — cancel it with a sum over a mirrored pair
+(`asym = pr_black + pr_sblack`, gnd-partialled) rather than reading the halves.
+
 **How to apply:** `read_file.m` now subtracts GND signed, applies one fixed per-channel
 sign taken from the whole-record mean, and no longer clamps at zero — so reverse flow
 survives (a future load-side PV, battery or bidirectional EV charger would be visible;

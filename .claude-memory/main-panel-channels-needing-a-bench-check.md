@@ -35,33 +35,61 @@ Correlation is scale-free and survives that. ⚠ `sub_r` and `sub_b` mirror `red
 `black` exactly, an artefact of signing each channel by its own long-run mean — compare
 r_red against r_black as magnitudes.
 
-| era | raw p9−gnd median | r_red | r_black | shape |
-|---|---|---|---|---|
-| 2019-06/07 | −1124 | 0.720 | 0.242 | earth path |
-| 2022-06/07 | −866 | 0.807 | 0.359 | earth path |
-| 2024-03/04 | −4412 | 0.505 | 0.496 | earth path |
-| 2024-08/09 | **+8068** | 0.296 | 0.107 | earth path |
-| 2024-10/11 | −60 | 0.211 | **0.694** | one leg |
-| 2026-02/03 | +252 | 0.075 | 0.239 | one leg |
-| 2026-08/09 | +1370 | 0.012 | 0.277 | one leg |
+⛔ **First check whether the channel is the reference.** `r(Δp9, Δgnd)` in raw signed
+counts — no sign convention involved — is ≈0 for every month 2018-12…2024-09, then
+**0.890, 0.931, and 0.984–0.996 for 2024-10 through 2025-06**. In that window port 9 *is*
+the GND column: the CT reads nothing, `p9 − gnd` is ~0, and any statistic built on it
+correlates with every channel through the shared `gnd` term rather than through load.
+It carries signal again from 2025-12 (r back to −0.25…−0.65).
 
-**Two CT events, both dated:**
+| era | raw p9−gnd median | r(Δp9,Δgnd) | r_red | r_black | reading |
+|---|---|---|---|---|---|
+| 2019-06/07 | −1124 | 0.00 | 0.720 | 0.242 | earth path |
+| 2022-06/07 | −866 | 0.01 | 0.807 | 0.359 | earth path |
+| 2024-03/04 | −4412 | 0.02 | 0.505 | 0.496 | earth path |
+| 2024-08/09 | **+8068** | 0.06 | 0.296 | 0.107 | earth path |
+| 2024-10/11 | −60 | **0.89–0.93** | 0.211 | 0.694 | ⛔ no signal — inadmissible |
+| 2024-12…2025-06 | ~+150 | **0.98–0.996** | — | — | ⛔ no signal — inadmissible |
+| 2026-02/03 | +252 | −0.27 | 0.075 | 0.239 | one leg |
+| 2026-08/09 | +1370 | −0.04 | 0.012 | 0.277 | one leg |
+
+⚠ **The `r_black` = 0.694 at 2024-10/11 is that artefact, not a branch signature** —
+"black high, red low" is the default for any channel sitting at the reference, because
+`Main Black`'s CT is reversed so its watts carry `+gnd` just as a below-reference port 9
+does, while red-signed channels carry `−gnd`. HOUSE_POWER caught this; its cleaner
+statistic is `asym = pr_black + pr_sblack` (gnd-partialled), which cancels common mode
+because those two reversed CTs mirror each other exactly, and which puts 2024-10/11 at
++0.002 — indistinguishable from 44 months of earth path.
+
+**Two CT events. The first is dated; the second is bounded, not dated:**
 
 1. **June–July 2024**, his panel work (240 V garage circuit, another outlet, "maybe moved
    ground wire CT"): the raw sign flips −4412 → +8068 and the magnitude nearly doubles,
    but the shape stays earth-path. **Reversed or repositioned on the earth path**, not
    moved to a load. The coupling changed, which is why the diverted share is only
    consistent up to 2024-04.
-2. **2024-09 → 2024-10**: the magnitude collapses *and* `red` drops away while `black`
-   takes over. **This is the move onto the branch.** ⚠ No data gap and no repo trace — the
-   board was not powered down, so this move left none of the tells the first one did.
-   What he did in the panel that autumn is the one open question on this channel.
+2. **The move onto the branch: bounded to 2024-10 … 2025-12, best guess 2024-10.** What
+   is certain is a real discontinuity at 2024-09 → 2024-10 — the raw count collapses from
+   +7664 to −60 — which needs a physical cause, and no other discontinuity falls between
+   there and the channel carrying signal again in 2025-12. That is parsimony, not
+   measurement: from 2024-10 to 2025-06 port 9 is the reference and reads nothing, the
+   board is dark 2025-07…2025-11, and **a branch circuit with nothing running is
+   indistinguishable from a CT clipped to nothing at all**. HOUSE_POWER's `asym` first
+   shows the one-leg signature in 2026-01, but that dates the first observed LOAD, not the
+   CT move, so it excludes nothing earlier. ⚠ No data gap and no repo trace at 2024-09/10
+   — the board was not powered down, so this move left none of the tells the first one
+   did. What he did in the panel that autumn is the one open question on this channel.
 
-The level only left the residual in 2026-08 because x570 was idle until then; the shape
-had been the branch shape for 22 months. ⛔ **2026-08 is not a CT event** — do not read it
-as a re-seat or as an onset. ⚠ The identity as x570 is anchored only at the 2026-08/09
-end; the black-only shape is continuous from 2024-10, so one move is the simplest reading,
-but a second move inside that window would not show.
+⛔ **2026-08 is not a CT event** — do not read it as a re-seat or an onset. It is x570
+starting to run: `asym` quadruples there while the channel had already been showing a
+steady one-leg asymmetry since 2026-01. ⚠ The identity as x570 specifically is anchored
+only at the 2026-08/09 end.
+
+⭐ **Corroboration for the modulation rule from a second direction**: through 2026-01…04
+the channel sits at 240–322 counts (12–17 W), squarely "pure residual" by level — yet its
+`asym` holds a consistent −0.07. Something small and real was on that circuit months
+before x570 came back. The ~25 W threshold governs the LEVEL only; the modulation carries
+usable signature well below it, exactly as the hour-of-day swing test says.
 
 ### Gain
 
