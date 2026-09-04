@@ -38,13 +38,41 @@ and whether the reading is current at all rather than a front-end artefact. Only
 after that is it worth ranking causes (neutral-to-ground bond fault, a borrowed
 neutral, a switching leakage path).
 
-## Two dead channels
+## `28 Air handler attic` (port 10) — a fault, and it failed TWICE
 
-`40 Lida` (port 12) and `28 Air handler attic` (port 10) read **exactly 0.0 W
-daily median on every day of 2026-08/09**, and 0 W monthly median in 2026-02, -04
-and -08 — dead across both heating and cooling season, so "wrong season" is out
-and, with crosstalk ruled out, so is a noise-floor explanation. Fallen or open CT,
-or a breaker off since before February. Physical check.
+The user states the attic air handler runs continuously, so any small reading is
+wrong. Monthly medians across the whole archive (`scripts/port10_history.py`):
+
+- **2018-12 … 2024-09: 3–20 W**, seasonal (13–20 W Jan–Apr, 8–10 W Jul–Sep).
+  An always-on air handler blower is hundreds of watts, so **the channel never
+  measured the load correctly**, from the very first month of data. A CT clamped
+  around a whole cable rather than one conductor fits: the go and return currents
+  cancel and only the imbalance shows, which is small and still tracks the load.
+- **2024-10 onwards: exactly 0.0 W.** The raw covariance value stepped from ~360
+  (against a GND reference of ~308) to 201 in 2024-10, and now sits *below* the
+  reference, so `max(|col|-|gnd|,0)` floors at zero. That is no signal at all.
+
+So: check that the CT is present and connected, **and** that it is around a single
+conductor. Fixing only the second fault gets 8–20 W back, not the real load.
+
+## `40 Lida` (port 12) — worked for three years, then stopped
+
+15–91 W from 2018-12 through 2021-08, then **exactly 0.0 from 2021-10 onward**.
+The user says this circuit has little or no use, so a zero reading is plausibly
+correct now — but it did read a real load for three years, so either the breaker
+went off around 2021-09 or the CT came off then. **Low priority; not a fault
+unless he expects that circuit to be live.**
+
+## ⚠ Absolute scale is NOT comparable across firmware epochs
+
+`22 heat exchanger` is the steadiest load in the house (within 2026-02: p05 109,
+p95 123 W) and reads **122 W (2019-01) drifting to 79 W (2025-05), then 119 W
+(2025-12), 106 W (2026-08)**. The raw value tracks it (2644 → 1828 → 2865), and
+the GND reference itself jumps ~300 → ~550 at the same 2025-12 boundary — the
+`/read` formatting fix, with the sampling loop reworked again in 2026-05. A
+constant load cannot do that, so the meter's absolute scale is epoch-dependent.
+**Normalise against `22 heat exchanger` before comparing watts across years**, or
+an anomaly detector will fire on firmware changes.
 
 ## Reading the numbers
 
