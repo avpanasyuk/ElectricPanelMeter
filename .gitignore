@@ -18,3 +18,8 @@
 /FirmwareV2/firmware.map
 .claude/settings.local.json
 .claude/*.tmp.*
+
+# WiFi fallback credentials -- never commit; see FirmwareV2/secrets.ini.example
+/FirmwareV2/secrets.ini
+# PlatformIO build tree (relocated to D:/WORK, but a stale one can reappear)
+/FirmwareV2/.pio/

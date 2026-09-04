@@ -62,7 +62,7 @@ Registered in `setup()`:
 
 ## Push to bsd (since v4.00)
 
-In addition to serving `/read` for pull, the device PUSHes a CSV row every 5 s to `http://bsd:8000/`. The filename matches the historical `readout_*.py` output naming so files appear in the same place with the same rotation:
+In addition to serving `/read` for pull, the device PUSHes a CSV row every 5 s to `http://bsd:8000/`. The filename matches the historical `readout_*.py` output naming so files appear in the same place with the same monthly rollover:
 
 ```
 PowerMonitor.v<CONF_VERSION>.<MM>.<YY>.<main|sub>.csv
@@ -73,9 +73,8 @@ PowerMonitor.v<CONF_VERSION>.<MM>.<YY>.<main|sub>.csv
 - `<main|sub>` is derived from `VERSION` (1 → "main", else "sub").
 - The push uses `avp::RemoteLog::postf(filename, ...)` from C_ESP/PLUG, which calls `HTTP_POST_puts` (lives in `C_ESP/client.cpp`, already pulled in by `build_src_filter = +<*>`).
 - bsd's `http_server.py` prepends a server-side timestamp and appends to
-  `/POOL/ARCHIVE/ESP_LOGS/<filename>` (open mode `'a'`, so restarts don't clobber). It also
-  rotates a file to `<name>.1` past 10 MiB and overwrites any existing `.1`, so a month's
-  `.csv` holds only its last few days -- see the project memory note.
+  `/POOL/ARCHIVE/ESP_LOGS/<filename>` (open mode `'a'`, so restarts don't clobber). The month
+  in the filename exempts these logs from its size rotation, so each month stays one file.
 - The push serializes the same `LastPower[]` snapshot that `/read` serves, so an external client polling `/read` in a loop and the 5 s push coexist cleanly — both always see a complete, identical set of per-port values.
 
 ## Submodule libraries (`src/C_*`)
