@@ -9,7 +9,42 @@ metadata:
 Measured 2026-09-04 with `scripts/channel_health.py` and `scripts/gnd_daily.py`
 (main unit, `read_file.m`'s formula).
 
-## `Grounding strip` (port 9) — the safety item
+## `Grounding strip` (port 9) — MEASURED, and handed to HOUSE_POWER
+
+**The conductor is the panel's grounding electrode conductor to the WATER MAIN**,
+and a clamp meter on it read **3.2–3.3 A** on 2026-09-04. So it is not a
+mislabelled CT and not an equipment ground fault — it is **parallel-path
+objectionable current** (NEC 250.6): the metal water service is an electrode
+bonded at the service, the neutral is bonded to it there, the utility neutral is
+multi-grounded, so neutral return current divides between the service neutral and
+the water main. A few amps there is a topology consequence, which is why no
+breaker or GFCI ever tripped on it in six years.
+
+**Decisive test, one breaker throw:** open the main disconnect and re-clamp the
+GEC. Gone → his own load (look for a load-side N-G bond, 250.142(B)). Still there
+→ utility/neighbour return through his water pipe, and it becomes a POCO matter.
+A large and *growing* figure is the signature of a degrading service neutral.
+
+⛔ **Never open the GEC/water bond while it carries current** — arcing, loss of the
+ground reference, and if the utility neutral is compromised the pipe may carry the
+neighbourhood's return, so breaking it can energise the plumbing. DSH's
+"remove the bond jumper" test applies to a *load-side* bond only, never here.
+
+⚠ **Watts badly understate this channel.** 3.25 A against the ~0.85 A in-phase
+implied by ~102 W is a power factor near 0.26. Do not use W as a current proxy on
+port 9 or compare it to load channels.
+
+**The condition is chronic, not new.** Monthly medians, reproduced from the raw
+archive: 61.7 W (2018-12) rising to 434.6 (2024-08) and 398.1 (2024-09); 0.0 in
+2024-10 and -11; 7–11 W to 2025-06; 10–20 W 2025-12…2026-07; 64.6 (2026-08),
+83.4 (2026-09). No firmware commit exists near 2024-10 or 2026-08 (the only 2024
+commit is 2024-08-13 and does not touch `FirmwareV2`; nothing after 2026-06-25), so
+those steps are **the CT being disturbed and later re-seated**, not the current
+starting and stopping. The 2026-08 "onset" was an artefact of that.
+
+**Owned by HOUSE_POWER from 2026-09-04**; this project keeps the meter itself.
+
+## Historical note — how it looked before it was measured
 
 Real power on a grounding conductor, **intermittent on a day scale**, not
 seasonal and not load-correlated. Daily medians, 2026-08/09: 81, 4.6, 82, 8.6,
@@ -31,8 +66,9 @@ differences on 1-min means (HOUSE_POWER, 2026-09-04): against 106 compressor ste
 gives slope 0.0037, r = 0.023; and 1834 feeder steps >200 W move the GND reference
 at slope −0.005, r = −0.078. So low-power channels carry **no** load-scaling floor.
 
-**If the clamp IS on a ground conductor** (researched 2026-09-04; citations opened and
-checked here, not taken on trust), the ranked causes are: a load-side
+Causes researched 2026-09-04, citations opened and checked here rather than taken on
+trust. With the conductor now known to be the GEC to the water main, **250.6 and the
+water-pipe bond are the operative ones** and the appliance-fault entry is not: a load-side
 neutral-to-ground bond (NEC **250.142(B)** *Load-Side Equipment* — verified
 numbering); a shared/borrowed neutral or miswired MWBC (300.13(B), 210.4(B)); an
 open or high-resistance neutral joint; an appliance case fault below breaker trip;
@@ -41,11 +77,10 @@ verified); a second bond on metal water/gas pipe. **EMI Y-capacitors are ruled o
 by arithmetic**: 2π·60·4.7 nF·120 V = 0.21 mA each and capacitive, so ~no real
 power, against the 87 W ≈ **0.725 A** in phase that is observed.
 
-⭐ **One field test serves both branches:** CT on the conductor, then flip breakers
-off one at a time. It names the responsible circuit whether the clamp is on a
-ground conductor or on a mislabelled live one. Also: 0.725 A of genuine
-ground-return current would trip any GFCI on that circuit instantly, and nothing
-has tripped — which favours either a non-GFCI circuit or the mislabel.
+⭐ The breaker-elimination sweep still names a contributing circuit if the main-off
+test shows the current is load-side. The GFCI argument I had made here was wrong: a
+GEC carries return current by design, so no GFCI sees it as an imbalance and nothing
+would ever trip.
 
 Verified sources: Mike Holt's N-G voltage article (the E=I·R worked example rising
 to 1.25 V) and EC&M's "What's Wrong Here" (green bonding screw in a load-side
