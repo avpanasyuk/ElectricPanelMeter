@@ -3,3 +3,4 @@
 - [EPM_main unreliable for years](epm-main-unreliable-for-years.md) — 9–63 % coverage since 2020, and 4.5 months of payload-free rows in 2025 that every liveness check read as green.
 - [Main-panel channels needing a bench check](main-panel-channels-needing-a-bench-check.md) — the `Grounding strip` CT is on the GEC to the water main, measured at 3.2-3.3 A (parallel-path current, HOUSE_POWER owns it); channel labels in `conf_main_v0.m` are unreliable; a flat 0.0 W means floored, not dead.
 - [read_file ground-subtraction sign](read-file-ground-subtraction-sign.md) — no 2 kW floor (that was line-side solar); the real defect was subtracting GND from the magnitude, ~140 W low on every reversed-CT channel including Main Black. Fixed.
+- [Main-board scale epochs](main-board-scale-epochs.md) — every date the watt scale could have moved; a conf edit never makes a boundary, the flash date does, and the GND column is the instrument.

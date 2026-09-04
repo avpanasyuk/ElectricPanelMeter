@@ -1,6 +1,6 @@
 ---
 name: main-panel-channels-needing-a-bench-check
-description: "The Grounding strip CT is on the GEC to the water main and it carries a measured 3.2-3.3 A - parallel-path objectionable current, owned by HOUSE_POWER; plus unreliable channel labels"
+description: "CLOSED by his decision: the GEC carries 3.2-3.3 A of parallel-path current and that is topology, not a defect - the CT stays off it, port 9 is now an ordinary unlabelled load channel; plus unreliable channel labels"
 metadata:
   node_type: memory
   type: project
@@ -9,7 +9,27 @@ metadata:
 Measured 2026-09-04 with `scripts/channel_health.py` and `scripts/gnd_daily.py`
 (main unit, `read_file.m`'s formula).
 
-## `Grounding strip` (port 9) — MEASURED, and handed to HOUSE_POWER
+## `Grounding strip` (port 9) — MEASURED, then CLOSED by his decision
+
+⛔ **Do not reopen this as a fault, and do not ask him to move the CT back.** He
+decided on 2026-09-04 that the CT stays where it is and no alarm gets built on the
+diverted share. A copper water main is not much worse a conductor than an aluminium
+service neutral, so a few amps taking it is topology. The measurement agrees: the
+divider ratio implies `Z_gec ≈ 2.7 × Z_neutral`, and the parallel path *lowers* the
+effective neutral impedance (`Z_eff = 0.73 × Z_n`) rather than raising it.
+
+⇒ **The diverted-share series ends at 2024-04, permanently.** It was flat at
+0.285–0.298 across 2019–2023, and his legs are symmetric. **Port 9 is an ordinary
+unlabelled load channel** from 2024-04 on — HOUSE_POWER models it on post-2024-04
+data and ignores its name. The rest of this section is the evidence, kept because it
+is what closed the question, not because anything is still open.
+
+One residual, recorded and not pursued: the share was flat through 2023, then rose to
+0.326 [0.322, 0.330] in 2024-03 and 0.329 [0.326, 0.332] in 2024-04 — non-overlapping
+CIs — immediately before the CT moved. Small, unexplained, now unobservable. It falls
+in the same **2024-05…2024-08 window** as the undocumented panel work in
+[[main-board-scale-epochs]], which is the one place left to look.
+
 
 **The conductor is the panel's grounding electrode conductor to the WATER MAIN**,
 and a clamp meter on it read **3.2–3.3 A** on 2026-09-04. So it is not a
@@ -71,18 +91,17 @@ nothing here rests on the artefact, and every slope is unaffected throughout.
 Per-month old-vs-new: `data/gnd_sign_correction_by_month.csv`.
 See [[read-file-ground-subtraction-sign]].
 
-⇒ **The GEC is not monitored at all right now**, and the fix is to move the CT back
-— not to re-tighten it. The degradation signal is unmeasurable until then, and a
-partially coupled channel reads low, so nothing supports a rising share; my earlier
+⇒ **The GEC is monitored by nothing, and that is now the accepted state.** A
+partially coupled channel reads low, so nothing supported a rising share; my earlier
 reading of 0.36→0.43 as possible neutral degradation was the level estimator picking
 up common mode, and is withdrawn.
 
 ⇒ It also explains the "three-state appliance" signature HOUSE_POWER found in
 2026-08/09 (a flat ~87 W plateau held for 8+ hours, 500–1000 W bursts, ~8 W days):
 **that is an appliance, because the CT is on an appliance circuit.** Which circuit
-is unknown. Open question: whether the CT has been on it since 2024 and the load
-started in August 2026, or whether it was moved again in August — the data cannot
-separate those.
+is unknown, and — the question being closed — is not worth a panel visit to find out.
+The data cannot say whether the CT has been on it since 2024 with the load starting in
+August 2026, or was moved again in August.
 
 The CT came off **between 2024-04-30 and 2024-08-01** (0.336 → 0.063; the months
 between hold too few rows to narrow it) and was partially re-seated between
