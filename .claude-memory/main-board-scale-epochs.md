@@ -69,8 +69,11 @@ power outlet, and "maybe moved ground wire CT"** — his words, "it should not h
 changed anything else." Main is dark through 2024-06/07 because he powered the board
 down to work.
 
-That accounts for the GND step (294.8 → 329.3 → 308.2 by 2024-10) and port 9 leaving the
-GEC — the archive could never have supplied either. **The feeders did not move**:
+That accounts for the GND step (294.8 → 329.3 → 308.2 by 2024-10) and for port 9's CT
+being reversed or repositioned on the earth path — the archive could never have supplied
+either. ⚠ It does **not** account for port 9 becoming a branch channel: that is a second,
+undocumented CT move at 2024-09/10, with no data gap and no repo trace
+([[main-panel-channels-needing-a-bench-check]] has the shape test that dates it). **The feeders did not move**:
 HOUSE_POWER's bill-plus-PV chain reads ~0.914 either side, so the board's scale is
 unchanged. CT and wiring work, not calibration. Treat **2024-06-01 … 2024-08-01 as a
 hard discontinuity for port 9 alone** — port 11 was wrongly added to it by both sessions

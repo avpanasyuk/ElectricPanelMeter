@@ -62,8 +62,8 @@ function [price, hour, Watts] = read_file(filename, conf)
   % offset every channel picks up. That offset is common to all channels with the same
   % sign -- a switched load's channel sits on the GND column's own value while its
   % breaker is off -- so it must be subtracted SIGNED, before any magnitude is taken.
-  % Subtracting it from the magnitude instead understates a reversed-CT channel by
-  % twice the offset (~140 W per feeder on the main board).
+  % Subtracting it from the magnitude understates a reversed-CT channel by twice the
+  % offset -- ~140 W on the main board's Main Black feeder.
   d = m(:,3:end-1) - repmat(m(:,end),1,size(m,2)-3);
   % One fixed orientation per channel, from the whole-record mean, applied per row.
   % abs() per row would rectify the single-cycle scatter of a near-zero channel into a

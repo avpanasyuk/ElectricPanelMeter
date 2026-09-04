@@ -45,8 +45,7 @@ signed subtraction correct.
 
 **Residual floor after the fix: ±20 W per channel, not zero.** `28 Air handler attic` and
 `40 Lida` average *below* GND (363 and 191 counts vs 505), so the offset is not identical
-across mux inputs. Their post-fix 14.7 W / 16.4 W is the magnitude of that residual, not
-power.
+across mux inputs, and a level of that size is not by itself a measurement.
 
 ⛔ **But test the MODULATION, not the level — a residual is constant, so it cannot make a
 diurnal shape.** "Under 25 W means nothing" is too blunt and throws away real load. The
@@ -58,7 +57,7 @@ GND column's own hour-of-day swing is the yardstick: **14.2 counts** over 2026-0
 | `40 Lida` | 615.6 | **43×** | 11.5 → 43.5 |
 | `38 Vova` | 273.9 | **19×** | 43.4 → 57.6 |
 | `24` | 238.7 | **17×** | 13.0 → 25.4 |
-| `Grounding strip` | 80.6 | 5.7× | 9.9 → 14.1 |
+| port 9 (x570 branch) | 80.6 | 5.7× | 9.9 → 14.1 |
 | `28 Air handler attic` | 18.8 | **1.3×** | −18.9 → −17.0 |
 
 ⇒ `40 Lida` and `24` carry real diurnal load of tens of watts even though their LEVELS sit
