@@ -30,6 +30,14 @@ up (~505 counts on the main board, Sept 2026).
    It only bites a channel sitting at the offset, and there the `max(…,0)` clamp
    dominates anyway.
 
+**Measured across the whole archive** (`scripts/gnd_sign_correction.py` →
+`data/gnd_sign_correction_by_month.csv`, 79 months, 2018-12…2026-09): the mains
+correction is **+3.2 to +5.0 % in every month through 2025-06**, then **+4.7 to +7.2 %
+from 2025-12 on** — the GND channel's ~300 → ~550 count step at that firmware rebuild,
+showing up exactly where it must. In watts, ~82 W before and ~150 W after. It is a
+per-epoch multiplicative-looking bias that is really a fixed additive one, so it hits a
+low-consumption month hardest.
+
 **The GND column is a common additive offset — verified, not assumed.** With its breaker
 off, `25 - Main A/C compressor` sits at a median of **517 counts** against the GND
 column's own **511**. A switched-off load reading exactly the reference is what makes the

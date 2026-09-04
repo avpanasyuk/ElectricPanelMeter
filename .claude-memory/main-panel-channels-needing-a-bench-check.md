@@ -59,6 +59,18 @@ so port 9 would read `125.1 W × 0.034/0.319 = 13.3 W`; it actually reads 64.8 W
 2026-08 and 84.4 W in 2026-09, **4.8–4.9× more than the GEC can account for**. That
 excess is a second, weakly-correlated source, i.e. another conductor.
 
+⚠ **Port 9's pre-2024 LEVELS are not comparable with these** — they were mostly
+rectification artefact. Under the old `max(|col| - |gnd|, 0)` the channel reported
+90–160 W in every month from 2018 to 2023; signed, most of those months collapse to
+4–50 W (2019-02: 103.8 → 4.0 W; 2018-12: 89.7 → 10.9 W) while a few barely move
+(2019-09: 147.4 → 149.7 W). Where old ≈ new the channel carried real current; where
+new ≪ old it was sitting on the offset. So port 9 was **intermittently** live long
+before 2024, not steadily so, and the 2024-08 step is larger than the old numbers
+suggested. The 2024-02…09 and 2026-08/09 levels quoted above move by under 8 %, so
+nothing here rests on the artefact, and every slope is unaffected throughout.
+Per-month old-vs-new: `data/gnd_sign_correction_by_month.csv`.
+See [[read-file-ground-subtraction-sign]].
+
 ⇒ **The GEC is not monitored at all right now**, and the fix is to move the CT back
 — not to re-tighten it. The degradation signal is unmeasurable until then, and a
 partially coupled channel reads low, so nothing supports a rising share; my earlier
