@@ -1,4 +1,4 @@
 - [Power log data flow](power-log-data-flow.md) — every reader goes to `//bsd/ARCHIVE/ESP_LOGS`; `/mnt/T` still answers but is frozen at 2026-09-02.
-- [ESP log sink rotation truncates months](esp-log-sink-rotation-truncates-months.md) — the 10 MiB rotation overwrote its single `.1` and destroyed Jun–Aug 2026; fix pushed, deploy pending; read every chunk plus `RECOVERED/`.
+- [ESP log sink rotation truncates months](esp-log-sink-rotation-truncates-months.md) — the 10 MiB rotation overwrote its single `.1` and destroyed most of Jun–Aug 2026; months since rebuilt to one file each, fix staged on bsd awaiting an `http_server` restart.
 - [EPM_main unreliable for years](epm-main-unreliable-for-years.md) — 9–63 % coverage since 2020, and 4.5 months of payload-free rows in 2025 that every liveness check read as green.
 - [Main-panel channels needing a bench check](main-panel-channels-needing-a-bench-check.md) — `40 Lida` and `28 Air handler` read dead every month; `Grounding strip` tracks the A/C, which is either a ground fault or crosstalk contaminating every small channel.
