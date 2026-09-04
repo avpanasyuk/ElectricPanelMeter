@@ -31,6 +31,30 @@ differences on 1-min means (HOUSE_POWER, 2026-09-04): against 106 compressor ste
 gives slope 0.0037, r = 0.023; and 1834 feeder steps >200 W move the GND reference
 at slope −0.005, r = −0.078. So low-power channels carry **no** load-scaling floor.
 
+**If the clamp IS on a ground conductor** (researched 2026-09-04; citations opened and
+checked here, not taken on trust), the ranked causes are: a load-side
+neutral-to-ground bond (NEC **250.142(B)** *Load-Side Equipment* — verified
+numbering); a shared/borrowed neutral or miswired MWBC (300.13(B), 210.4(B)); an
+open or high-resistance neutral joint; an appliance case fault below breaker trip;
+objectionable current over parallel paths (NEC **250.6** *Objectionable Current* —
+verified); a second bond on metal water/gas pipe. **EMI Y-capacitors are ruled out
+by arithmetic**: 2π·60·4.7 nF·120 V = 0.21 mA each and capacitive, so ~no real
+power, against the 87 W ≈ **0.725 A** in phase that is observed.
+
+⭐ **One field test serves both branches:** CT on the conductor, then flip breakers
+off one at a time. It names the responsible circuit whether the clamp is on a
+ground conductor or on a mislabelled live one. Also: 0.725 A of genuine
+ground-return current would trip any GFCI on that circuit instantly, and nothing
+has tripped — which favours either a non-GFCI circuit or the mislabel.
+
+Verified sources: Mike Holt's N-G voltage article (the E=I·R worked example rising
+to 1.25 V) and EC&M's "What's Wrong Here" (green bonding screw in a load-side
+subpanel, citing 250.24(A)(1), 250.24(A)(5), 408.20 in 2003 numbering). ⚠ The IAEI
+"parallel paths" article returned 403 here — its "large percentage of the neutral
+current" quote is **unverified**. ⚠ NEC section *text* was cited only to a
+third-party HuggingFace scrape of NFPA-copyright material — no authority; the
+section *numbers* above were confirmed independently instead.
+
 **Next step is physical, and it is the one item here with a safety implication:**
 a clamp meter on the actual conductor on a high day. That settles both things data
 cannot — whether the clamp is on what `conf_main_v0.m` calls a grounding strip,
