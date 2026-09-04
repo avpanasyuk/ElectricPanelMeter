@@ -1,1 +1,2 @@
-- [Power log data flow](power-log-data-flow.md) — bsd `/mnt/T` (`//bsd/USB_FLASH`) is the live push buffer; finished months move monthly to `/POOL/ARCHIVE/POWER` (`//bsd/ARCHIVE/POWER`), which is where `show1.m` reads — do not repoint it at the live buffer.
+- [Power log data flow](power-log-data-flow.md) — every reader goes to `//bsd/ARCHIVE/ESP_LOGS`; `/mnt/T` still answers but is frozen at 2026-09-02.
+- [ESP log sink rotation truncates months](esp-log-sink-rotation-truncates-months.md) — http_server.py's 10 MiB rotation overwrites the single `.1`, so each month since 2026-06 keeps only its last ~4-9 days.

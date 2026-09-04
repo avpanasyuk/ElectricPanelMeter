@@ -1,28 +1,26 @@
 ---
 name: power-log-data-flow
-description: "Where EPM power CSV logs live on bsd, and which dir show1.m must read"
+description: "Where EPM power CSV logs live on bsd, and which dir the MATLAB scripts read"
 metadata: 
   node_type: memory
   type: project
   originSessionId: 8b29c43a-0137-4fb7-b923-2893ff129f92
 ---
 
-The ESP firmware pushes power-meter CSV rows **live** to bsd `/mnt/T` (the
-`http_server.py` sink; SMB share `//bsd/USB_FLASH`). A **monthly** job then
-moves each **finished** month's `PowerMonitor.v*.MM.YY.{main,sub}.csv` into
-`/POOL/ARCHIVE/POWER` (SMB share `//bsd/ARCHIVE/POWER`).
+The ESP firmware pushes power-meter CSV rows to bsd's `http_server.py` sink,
+which writes them into **`/POOL/ARCHIVE/ESP_LOGS`**
+(SMB share `//bsd/ARCHIVE/ESP_LOGS`). One directory, live and historical
+together: there is no second location and no monthly move job. `MATLAB/show1.m`,
+`show.m` and `month_by_month.m` all `cd` there, and `conf_sub_v2.m` sets
+`conf.dir` to the same path.
 
-`MATLAB/show1.m` (and `show.m` / `month_by_month.m`) plot **completed** months,
-so they `cd('//bsd/ARCHIVE/POWER/')`. **Do NOT repoint show1 at `//bsd/USB_FLASH`.**
-The in-progress **current** month exists only in `/mnt/T` (`//bsd/USB_FLASH`)
-until it is moved at month end — read it there directly for an ad-hoc
-current-month check.
+**Why:** the old two-tier flow (live buffer on `/mnt/T` = `//bsd/USB_FLASH`,
+month-end move to `/POOL/ARCHIVE/POWER`) was retired in the 2026-09-02 sink move.
+`/POOL/ARCHIVE/POWER` no longer exists, and `/mnt/T` is still mounted but frozen
+at 2026-09-02 21:11 — it answers reads with pre-move data and **no error**, so
+anyone following the old note gets stale rows with no clue anything is wrong.
 
-**Why:** the archive's current-month file looks stale mid-month (e.g. frozen on
-the 1st) only because the move runs at month end — it is NOT broken. I mistook
-the live buffer for the source of truth and wrongly repointed show1 at
-USB_FLASH; reverted.
-**How to apply:** show1/show/month_by_month → `//bsd/ARCHIVE/POWER`; ad-hoc
-current-month look → `/mnt/T` (`//bsd/USB_FLASH`). Column 1 of these logs is
-dual-format (legacy Unix epoch + `yyyy-MM-dd HH:mm:ss.SS` since 2026-06-23),
-handled by `read_file.m`.
+**How to apply:** every reader → `//bsd/ARCHIVE/ESP_LOGS`. Never `/mnt/T` or
+`//bsd/USB_FLASH`. Column 1 of these logs is dual-format (legacy Unix epoch +
+`yyyy-MM-dd HH:mm:ss.SS` since 2026-06-23), handled by `read_file.m`.
+See [[esp-log-sink-rotation-truncates-months]] before trusting a month's row count.

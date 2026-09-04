@@ -72,7 +72,10 @@ PowerMonitor.v<CONF_VERSION>.<MM>.<YY>.<main|sub>.csv
 - `<MM>.<YY>` is the current local month/year — the filename rolls over monthly automatically. Requires NTP, which is started in `setup()` via `configTime(NTP_TZ, "pool.ntp.org")`; default `NTP_TZ` is `EST5EDT,M3.2.0/2,M11.1.0/2`. Push skips a tick if the clock hasn't synced yet.
 - `<main|sub>` is derived from `VERSION` (1 → "main", else "sub").
 - The push uses `avp::RemoteLog::postf(filename, ...)` from C_ESP/PLUG, which calls `HTTP_POST_puts` (lives in `C_ESP/client.cpp`, already pulled in by `build_src_filter = +<*>`).
-- bsd's `http_server.py` prepends a server-side timestamp and appends to `/mnt/T/<filename>` (open mode `'a'`, so restarts don't clobber).
+- bsd's `http_server.py` prepends a server-side timestamp and appends to
+  `/POOL/ARCHIVE/ESP_LOGS/<filename>` (open mode `'a'`, so restarts don't clobber). It also
+  rotates a file to `<name>.1` past 10 MiB and overwrites any existing `.1`, so a month's
+  `.csv` holds only its last few days -- see the project memory note.
 - The push serializes the same `LastPower[]` snapshot that `/read` serves, so an external client polling `/read` in a loop and the 5 s push coexist cleanly — both always see a complete, identical set of per-port values.
 
 ## Submodule libraries (`src/C_*`)
