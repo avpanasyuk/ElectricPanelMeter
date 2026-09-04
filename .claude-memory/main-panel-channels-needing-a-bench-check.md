@@ -53,10 +53,24 @@ is itself the CT-position diagnostic**:
 | 2026-08 | 0.204 | **0.034** | ~1/8 coupled |
 | 2026-09 | 0.431 | **0.045** | ~1/8 coupled |
 
-⭐ **So the CT still needs re-seating**, and until it is, the degradation signal is
-not measurable. A partially seated CT reads *low*, so nothing here supports a
-rising share — my earlier reading of 0.36→0.43 as possible neutral degradation was
-the level estimator picking up common mode, and is withdrawn.
+⭐ **The CT is on a DIFFERENT WIRE, not loosely on the GEC** — the user suspects he
+moved it and forgot, and the levels confirm it. A loose CT scales the same waveform,
+so port 9 would read `125.1 W × 0.034/0.319 = 13.3 W`; it actually reads 64.8 W in
+2026-08 and 84.4 W in 2026-09, **4.8–4.9× more than the GEC can account for**. That
+excess is a second, weakly-correlated source, i.e. another conductor.
+
+⇒ **The GEC is not monitored at all right now**, and the fix is to move the CT back
+— not to re-tighten it. The degradation signal is unmeasurable until then, and a
+partially coupled channel reads low, so nothing supports a rising share; my earlier
+reading of 0.36→0.43 as possible neutral degradation was the level estimator picking
+up common mode, and is withdrawn.
+
+⇒ It also explains the "three-state appliance" signature HOUSE_POWER found in
+2026-08/09 (a flat ~87 W plateau held for 8+ hours, 500–1000 W bursts, ~8 W days):
+**that is an appliance, because the CT is on an appliance circuit.** Which circuit
+is unknown. Open question: whether the CT has been on it since 2024 and the load
+started in August 2026, or whether it was moved again in August — the data cannot
+separate those.
 
 The CT came off **between 2024-04-30 and 2024-08-01** (0.336 → 0.063; the months
 between hold too few rows to narrow it) and was partially re-seated between
