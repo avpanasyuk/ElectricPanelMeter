@@ -3,25 +3,19 @@ function files = month_chunks(pattern)
   %> @param pattern - a filename or glob for the bare .csv, e.g.
   %>        'PowerMonitor.v*.08.26.main.csv'
   %
-  % A month is spread over several files:
-  %  - RECOVERED/<name>   rows restored from ZFS snapshots, absent from the sink
-  %  - <name>.<suffix>    chunks the sink rotated aside, earliest first
-  %  - <name>             the live file, holding the most recent rows
-  % Globbing only the bare .csv yields the tail of the month with nothing to
-  % indicate the rest exists. Ordering here is approximate; read_file sorts rows
-  % by timestamp, so a suffix scheme this does not understand still comes out
-  % chronological.
+  % A power log is one file per month: bsd's http_server exempts a filename that
+  % carries the month from size rotation, precisely so a month is never split.
+  % This still collects siblings, because a log that is NOT exempt is rotated to
+  % <name>.<YYYYmmdd-HHMMSS>, and because a month split by the old rotation would
+  % otherwise be read as just its tail with nothing to say so. Ordering here is
+  % approximate (bare .csv last); read_file sorts rows by timestamp.
 
   [pdir, pname, pext] = fileparts(char(pattern));
-  glob = [pname pext '*'];
-
-  d = dir(fullfile(pdir, glob));
-  r = dir(fullfile(pdir, 'RECOVERED', glob));
-  d = [r(:); d(:)];
+  d = dir(fullfile(pdir, [pname pext '*']));
   d = d(~[d.isdir]);
   if isempty(d), files = strings(0,1); return; end
 
   paths = fullfile(string({d.folder}.'), string({d.name}.'));
-  isBare = endsWith(paths, '.csv') & ~contains(paths, [filesep 'RECOVERED' filesep]);
-  files = [paths(~isBare); paths(isBare)];
+  isBare = endsWith(paths, '.csv');
+  files = [sort(paths(~isBare)); paths(isBare)];
 end
