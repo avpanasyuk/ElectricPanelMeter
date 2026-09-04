@@ -1,6 +1,6 @@
 ---
 name: main-panel-channels-needing-a-bench-check
-description: "Grounding strip carries real power on alternating days (~90 W, p95 920 W) matching no metered circuit - safety item; 40 Lida and 28 Air handler read dead in every month"
+description: "The Grounding strip CT is on the GEC to the water main and it carries a measured 3.2-3.3 A - parallel-path objectionable current, owned by HOUSE_POWER; plus unreliable channel labels"
 metadata:
   node_type: memory
   type: project
@@ -49,9 +49,8 @@ starting and stopping. The 2026-08 "onset" was an artefact of that.
 Real power on a grounding conductor, **intermittent on a day scale**, not
 seasonal and not load-correlated. Daily medians, 2026-08/09: 81, 4.6, 82, 8.6,
 9.0, 114, 103, 101, 71, 13.5 W — alternating high/low, ratio 10.2x, p95 to 920 W.
-Monthly medians sat at 11–14 W for 2026-01…07, so onset is between 2026-08-01 and
-2026-08-25 (inside the window the rotation bug destroyed; it cannot be dated more
-finely).
+Monthly medians sat at 11–14 W for 2026-01…07. That was read at the time as an
+onset between 2026-08-01 and 2026-08-25; it was the CT being re-seated.
 
 **No metered channel matches the pattern**, so the responsible load is on an
 unmetered circuit. Correlation of each channel's daily median against the
@@ -90,12 +89,10 @@ current" quote is **unverified**. ⚠ NEC section *text* was cited only to a
 third-party HuggingFace scrape of NFPA-copyright material — no authority; the
 section *numbers* above were confirmed independently instead.
 
-**Next step is physical, and it is the one item here with a safety implication:**
-a clamp meter on the actual conductor on a high day. That settles both things data
-cannot — whether the clamp is on what `conf_main_v0.m` calls a grounding strip,
-and whether the reading is current at all rather than a front-end artefact. Only
-after that is it worth ranking causes (neutral-to-ground bond fault, a borrowed
-neutral, a switching leakage path).
+That clamp-meter step has been taken — see the top of this file. It is the reason
+none of the above analysis settled anything: **one minute with a clamp meter beat
+eight years of logs**, because the logs could not tell a real current from a
+mislabelled CT and the meter could.
 
 ## ⛔ "Exactly 0.0 W" means FLOORED, not disconnected
 

@@ -1,4 +1,4 @@
 - [Power log data flow](power-log-data-flow.md) — every reader goes to `//bsd/ARCHIVE/ESP_LOGS`; `/mnt/T` still answers but is frozen at 2026-09-02.
 - [ESP log sink rotation truncates months](esp-log-sink-rotation-truncates-months.md) — the 10 MiB rotation overwrote its single `.1` and destroyed most of Jun–Aug 2026; months since rebuilt to one file each, fix staged on bsd awaiting an `http_server` restart.
 - [EPM_main unreliable for years](epm-main-unreliable-for-years.md) — 9–63 % coverage since 2020, and 4.5 months of payload-free rows in 2025 that every liveness check read as green.
-- [Main-panel channels needing a bench check](main-panel-channels-needing-a-bench-check.md) — `Grounding strip` carries real power on alternating days matching no metered circuit (safety item, clamp meter); `40 Lida` and `28 Air handler` read dead in every month.
+- [Main-panel channels needing a bench check](main-panel-channels-needing-a-bench-check.md) — the `Grounding strip` CT is on the GEC to the water main, measured at 3.2-3.3 A (parallel-path current, HOUSE_POWER owns it); channel labels in `conf_main_v0.m` are unreliable; a flat 0.0 W means floored, not dead.
