@@ -7,14 +7,15 @@ function show1(IsSub,month,year,indexes)
   cd('//bsd/ARCHIVE/ESP_LOGS/')
   if IsSub, PanelID = 'sub'; else PanelID = 'main'; end
   FileNameTemp = sprintf(['PowerMonitor.v*.%02d.%02d.' PanelID '.csv'],month,year);
-  f = dir(FileNameTemp);
+  f = month_chunks(FileNameTemp); % a month can span several rotated chunks
   if isempty(f), error('Can not find the record!'); end
-  Ver = sscanf(f.name,'PowerMonitor.v%1c.');
-  
+  [~, FirstName] = fileparts(f(1));
+  Ver = sscanf(char(FirstName),'PowerMonitor.v%1c.');
+
   run([PROJECT_DIR '\conf_', PanelID ,'_v', Ver, '.m'])
-  
-  [price, hour, Watts] = read_file(f.name, conf);
-  
+
+  [price, hour, Watts] = read_file(f, conf);
+
   if exist('indexes','var') && numel(indexes) > 0
     Watts = Watts(:,indexes);
     conf.port = conf.port(indexes);

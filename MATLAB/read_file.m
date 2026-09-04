@@ -1,4 +1,6 @@
 function [price, hour, Watts] = read_file(filename, conf)
+  %> @param filename - one log file, or several covering the same month (see
+  %>        month_chunks); rows from all of them are pooled and sorted by time.
   % CSV layout: column 1 is a timestamp, the rest are ADC values (col 2 = the
   % shared voltage channel, last column = ground reference). The timestamp
   % column appears in two formats, which may be mixed within one file:
@@ -6,8 +8,12 @@ function [price, hour, Watts] = read_file(filename, conf)
   %   current: local wall-clock 'yyyy-MM-dd HH:mm:ss.SS' (bsd http_server.py)
   % Both are normalized to epoch seconds here, then to local hours below.
 
-  lines = strip(readlines(filename));
-  lines = lines(strlength(lines) > 0); % drop blank/trailing lines
+  files = string(filename);
+  lines = strings(0,1);
+  for fI = 1:numel(files)
+    l = strip(readlines(files(fI)));
+    lines = [lines; l(strlength(l) > 0)]; %#ok<AGROW> % drop blank/trailing lines
+  end
 
   % Keep only well-formed rows (the dominant column count); guards against a
   % corrupted first line or a stray CR that splits a row.
@@ -34,6 +40,9 @@ function [price, hour, Watts] = read_file(filename, conf)
 
   m = [epoch, abs(double(parts(:, 2:end)))]; % ADC cols: abs; unparseable -> NaN
   m = m(~any(isnan(m), 2), :); % drop rows with any bad field
+  % Chunks are pooled above, so order the rows by time before anything downstream
+  % (break detection, trapz) reads a difference between consecutive rows.
+  m = sortrows(m, 1);
 
   % Convert epoch seconds (col 1) to local wall-clock time, DST-aware: the
   % America/New_York zone applies the EST(-5)/EDT(-4) switch automatically.

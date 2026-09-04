@@ -1,8 +1,11 @@
 function month_by_month(PanelID)
   % plot all data month by month
   global PROJECT_DIR
-  
+
   cd('//bsd/ARCHIVE/ESP_LOGS/');
+  % Glob the bare .csv only: it names the month, and month_chunks then collects
+  % that month's rotated chunks. Globbing '.csv*' here would make one month
+  % appear once per chunk.
   FileNameTemp = ['PowerMonitor.v*.*.*.' PanelID '.csv'];
   f = dir(FileNameTemp);
   for fI = 1:numel(f)
@@ -12,8 +15,8 @@ function month_by_month(PanelID)
       error('File name seems to be in the wrong format, please check!')
     end
     run([PROJECT_DIR '\conf_', char(Parsed(4:end).'),'_v', Parsed(1), '.m'])
-    
-    price(:,fI) = read_file(fn, conf);
+
+    price(:,fI) = read_file(month_chunks(fn), conf);
     month(fI) = Parsed(2) + 12*Parsed(3) - 1;
   end
   [month_sorted, sI] = sort(month);

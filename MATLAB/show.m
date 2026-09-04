@@ -1,17 +1,18 @@
 function show(filename,indexes)
+  %> @param filename - the bare .csv of a month; its rotated chunks are added
   %> @param indexes - indexes of circuits to show
   global PROJECT_DIR
-  
+
   [~, name] = fileparts(filename);
   Parsed = sscanf(name,'PowerMonitor.v%1c.%02d.%02d.%[submain]');
-  
+
   if numel(Parsed) ~= 6 && numel(Parsed) ~= 7
     error('File name seems to be in the wrong format, please check!')
   end
-  
+
   run([PROJECT_DIR '\conf_', char(Parsed(4:end).'),'_v', Parsed(1), '.m'])
-    
-  [price, hour, Watts] = read_file(filename, conf);
+
+  [price, hour, Watts] = read_file(month_chunks(filename), conf);
 
   if exist('indexes','var') && numel(indexes) > 0
     Watts = Watts(:,indexes);
