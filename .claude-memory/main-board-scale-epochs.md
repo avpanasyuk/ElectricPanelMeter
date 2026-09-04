@@ -62,13 +62,22 @@ drift. **Two epochs on main and nothing else.** It is a board diagnostic, so it 
 check, not the key — but it beats any load channel. See
 [[read-file-ground-subtraction-sign]] for why that column matters twice over.
 
-## ⚠ One hardware event in no record: 2024-05 → 2024-08
+## The 2024-06/07 gap — ANSWERED by him, 2026-09-04
 
-Main logs 3458 rows in 2024-05, **nothing in 2024-06 or 2024-07**, 288185 in 2024-08.
-Across that gap GND steps 294.8 → 329.3, settling back to 308.2 by 2024-10 — GND carries
-no load, so the board or its wiring was touched, not just a CT. The only repo trace is
-`5538c31` 2024-08-13 "Elecric updated" (labels). This is the same intervention as the
-port-9 CT move and the unexplained 2024-03/04 share rise in
-[[main-panel-channels-needing-a-bench-check]]. **What he did in the panel in June–July
-2024 is the one question that would close three loose ends at once** — ask him if the
-subject comes up; it does not justify a panel visit on its own.
+He did the panel work himself: **added a 240 V circuit to the garage, added another
+power outlet, and "maybe moved ground wire CT"** — his words, "it should not have
+changed anything else." Main is dark through 2024-06/07 because he powered the board
+down to work.
+
+That accounts for the GND step (294.8 → 329.3 → 308.2 by 2024-10), port 9 leaving the
+GEC, and the collapse of port 11 — the archive could never have supplied any of it.
+**The feeders did not move**: HOUSE_POWER's bill-plus-PV chain reads ~0.914 either side,
+so the board's scale is unchanged. CT and wiring work, not calibration. Treat
+**2024-06-01 … 2024-08-01 as a hard discontinuity for ports 9 and 11 only.**
+
+⛔ **The lesson, worth more than the answer: when a step lands in a window where the
+meter also went dark, ASK HIM FIRST.** Those two coincide precisely because he powers the
+board down to work on the panel, so the gap is the tell. Two sessions spent a long
+exchange inferring a physical event from ADC counts, firmware history and commit logs,
+and one question settled it. HOUSE_POWER records the same lesson in its own
+`panel-work-june-july-2024.md`.

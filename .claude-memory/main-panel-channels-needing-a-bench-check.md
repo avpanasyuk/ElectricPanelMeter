@@ -91,6 +91,18 @@ nothing here rests on the artefact, and every slope is unaffected throughout.
 Per-month old-vs-new: `data/gnd_sign_correction_by_month.csv`.
 See [[read-file-ground-subtraction-sign]].
 
+⭐ **The CT move is confirmed by him, and it happened in June–July 2024** — he added a
+240 V garage circuit and another outlet, and "maybe moved ground wire CT" (2026-09-04).
+So the CT-position inference above was right, and the date is fixed. See
+[[main-board-scale-epochs]].
+
+⚠ **Port 9 has TWO breaks, not one** — do not model it as a single channel after 2024-04.
+Corrected monthly means: 116.7 W (2024-05) → **330.8, 351.2** (2024-08/09) → **2.8, 1.4,
+5.9** (2024-10/11/12) → ~2–7 W through 2025 → 19.7 (2025-12) → 137–238 (2026-08/09). The
+June–July work moved the CT onto something that carried MORE than the GEC, which is why
+the level rose while the coupling slope collapsed to 0.063. Then a **second** event in
+September–October 2024 took it to zero — that one has no explanation and no gap to date it.
+
 ⇒ **The GEC is monitored by nothing, and that is now the accepted state.** A
 partially coupled channel reads low, so nothing supported a rising share; my earlier
 reading of 0.36→0.43 as possible neutral degradation was the level estimator picking
@@ -208,6 +220,15 @@ mode in this panel, not a speculative one.
 
 Open questions for a panel visit: what port 10's CT is actually clamped on, why it
 went dead in 2024-10, and whether the attic air handler is metered at all.
+
+## `38 Vova` (port 11) — disturbed by the same June–July 2024 work
+
+Corrected monthly means: 12–64 W through 2023 (variable, never a steady baseline),
+46.6 / 64.9 / 58.3 / 45.8 W in 2024-02…05, then **12.6 (2024-08), 2.0 (2024-09)** and
+~2–8 W ever after. The break is across the 2024-06/07 panel gap, so that CT was
+disturbed or its circuit re-routed along with port 9's. Neighbouring `24` and `26` are
+flat across the same window (12 W and 111–186 W either side), so the disturbance was
+local to those two CTs, not board-wide.
 
 ## `40 Lida` (port 12) — worked for three years, then stopped
 
