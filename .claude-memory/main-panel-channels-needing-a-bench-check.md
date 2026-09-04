@@ -91,6 +91,29 @@ nothing here rests on the artefact, and every slope is unaffected throughout.
 Per-month old-vs-new: `data/gnd_sign_correction_by_month.csv`.
 See [[read-file-ground-subtraction-sign]].
 
+⭐⭐ **IDENTIFIED, 2026-09-04: main port 9 is the branch circuit feeding the x570
+workstation.** HOUSE_POWER caught x570's smart plug stepping 78 → 811 W and differenced
+every channel on both panels across it: `port9 = 1.037 × plug_raw + 4.2 W`, residual
+sd 40 W, edge simultaneous to the minute. The ~4 W intercept says that circuit carries
+x570 and essentially nothing else.
+
+Confirmed here independently, with no plug in the chain — paired 1-minute differences
+over 2026-08/09, selecting the 350 minutes where port 9 steps >3σ: **the step lands in
+`Main Black` and nowhere else** (`Main Red` 0.032, `Subpanel Black` 0.007, `Subpanel Red`
+0.031, `26` 0.000). A GEC CT would show as a fraction of the neutral *unbalance*, never
+1:1 into one leg. `conf_main_v0.m` port 9 is relabelled `x570 branch (GEC before
+2024-06)` — era-explicit, because the conf is applied retroactively to all v0 main data
+and no single name is correct for both sides of the move.
+
+⚠ **Gain: port 9 reads ~1.07× Main Black, bracket [0.97, 1.18]** — so ~1.08 absolute
+against the feeders' ~1.01. HOUSE_POWER's ×1.12 from the plug sits inside that, but so
+does 1.00, **so "per-port gains differ by ~10 % on the same board" is supported and not
+yet established.** ⛔ The bracket is what matters, not a point estimate: selecting minutes
+on |Δport9| inflates its variance and attenuates the forward slope (0.846 raw, an
+artefact I nearly quoted), while selecting on |Δblack| picks mostly other loads on that
+leg and gives r = 0.107. Use the errors-in-variables bracket
+`[slope(y|x), 1/slope(x|y)]`, both from the port-9-selected set.
+
 ⭐ **The CT move is confirmed by him, and it happened in June–July 2024** — he added a
 240 V garage circuit and another outlet, and "maybe moved ground wire CT" (2026-09-04).
 So the CT-position inference above was right, and the date is fixed. See
