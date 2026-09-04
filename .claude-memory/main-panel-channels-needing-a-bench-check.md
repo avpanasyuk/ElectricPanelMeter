@@ -38,22 +38,23 @@ and whether the reading is current at all rather than a front-end artefact. Only
 after that is it worth ranking causes (neutral-to-ground bond fault, a borrowed
 neutral, a switching leakage path).
 
-## `28 Air handler attic` (port 10) — a fault, and it failed TWICE
+## ⛔ `conf_main_v0.m` channel LABELS are not reliable
 
-The user states the attic air handler runs continuously, so any small reading is
-wrong. Monthly medians across the whole archive (`scripts/port10_history.py`):
+Port 10 is labelled `28 Air handler attic`. The attic air handler runs
+continuously and a blower is hundreds of watts, but the channel read **3–20 W from
+2018-12 to 2024-09** and then **exactly 0.0 from 2024-10 on** (raw stepped ~360 →
+201 against a ~308 GND reference; it now sits below the reference, which floors the
+watts at zero). The user's reading: **3–20 W is far too low for that air handler,
+so the channel is probably mislabelled** — it is measuring some other small load,
+which then stopped in 2024-10.
 
-- **2018-12 … 2024-09: 3–20 W**, seasonal (13–20 W Jan–Apr, 8–10 W Jul–Sep).
-  An always-on air handler blower is hundreds of watts, so **the channel never
-  measured the load correctly**, from the very first month of data. A CT clamped
-  around a whole cable rather than one conductor fits: the go and return currents
-  cancel and only the imbalance shows, which is small and still tracks the load.
-- **2024-10 onwards: exactly 0.0 W.** The raw covariance value stepped from ~360
-  (against a GND reference of ~308) to 201 in 2024-10, and now sits *below* the
-  reference, so `max(|col|-|gnd|,0)` floors at zero. That is no signal at all.
+**Consequence for everything else here: treat every label in `conf_main_v0.m` as a
+hypothesis, not a fact.** It also raises the odds on the `Grounding strip`
+explanation — a CT that is not on what its label says is a demonstrated failure
+mode in this panel, not a speculative one.
 
-So: check that the CT is present and connected, **and** that it is around a single
-conductor. Fixing only the second fault gets 8–20 W back, not the real load.
+Open questions for a panel visit: what port 10's CT is actually clamped on, why it
+went dead in 2024-10, and whether the attic air handler is metered at all.
 
 ## `40 Lida` (port 12) — worked for three years, then stopped
 
@@ -63,16 +64,25 @@ correct now — but it did read a real load for three years, so either the break
 went off around 2021-09 or the CT came off then. **Low priority; not a fault
 unless he expects that circuit to be live.**
 
-## ⚠ Absolute scale is NOT comparable across firmware epochs
+## ⛔ There is NO constant reference load — do not use `22 heat exchanger`
 
-`22 heat exchanger` is the steadiest load in the house (within 2026-02: p05 109,
-p95 123 W) and reads **122 W (2019-01) drifting to 79 W (2025-05), then 119 W
-(2025-12), 106 W (2026-08)**. The raw value tracks it (2644 → 1828 → 2865), and
-the GND reference itself jumps ~300 → ~550 at the same 2025-12 boundary — the
-`/read` formatting fix, with the sampling loop reworked again in 2026-05. A
-constant load cannot do that, so the meter's absolute scale is epoch-dependent.
-**Normalise against `22 heat exchanger` before comparing watts across years**, or
-an anomaly detector will fire on firmware changes.
+`22 heat exchanger` looks like the steadiest load in the house (within 2026-02:
+p05 109, p95 123 W) and its monthly median moves 122 W (2019-01) → 79 W (2025-05)
+→ 119 W (2025-12) → 107 W (2026-08). **That is not instrument drift.** The user
+ran it through an **auto-transformer and adjusted it from time to time**, removing
+the auto-transformer during 2026. Its level is a record of those adjustments, so it
+cannot calibrate anything and a year-over-year change in it is not a finding.
+
+What does stand: the **GND reference channel steps ~300 → ~550** at the 2025-12
+firmware rebuild (the `/read` fix; the sampling loop was reworked again in
+2026-05). That channel is a grounded mux input, so its magnitude is a noise
+statistic set by samples-per-scan, not by any load — and since it is *subtracted*
+from every channel, a higher floor pushes small channels down. Enough to matter for
+low-power channels across that boundary; not evidence of a gain change.
+
+**No validated constant load exists in this data**, so gain stability across
+firmware epochs is currently unmeasured in either direction. A known resistive load
+would settle it, and is the same bench test that settles the two-board question.
 
 ## Reading the numbers
 
