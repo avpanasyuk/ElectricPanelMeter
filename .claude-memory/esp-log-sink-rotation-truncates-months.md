@@ -1,27 +1,34 @@
 ---
 name: esp-log-sink-rotation-truncates-months
-description: "bsd's http_server.py rotates at 10 MiB and overwrites the single .1, so each EPM month keeps only its last ~4-9 days"
+description: "bsd's http_server.py rotated at 10 MiB and overwrote the single .1, destroying Jun-Aug 2026; fix written, deploy pending"
 metadata:
   node_type: memory
   type: project
 ---
 
-bsd's `http_server.py` rotates a log to `<file>.1` once it passes
-`max_log_bytes` (10 MiB) and **replaces** any existing `.1`. Each EPM unit posts
-one ~145-byte row every 5 s ≈ 104 KB/h, so a monthly file crosses 10 MiB every
-~4.2 days and rotates ~7 times a month. Only the last two chunks survive:
-`PowerMonitor.v0.08.26.main.csv.1` starts 2026-08-25, the `.csv` covers 08-30
-onward, and August 1–25 is gone. Same on the sub unit; first `.1` files are
-2026-06. Not in ZFS snapshots (written to `/mnt/T`, which is outside the
-`POOL/ARCHIVE` snapshot set), so 2026-06 … 2026-08 is unrecoverable.
+bsd's `http_server.py` rotated a log to `<file>.1` past 10 MiB and **replaced**
+any existing `.1`. Each meter posts ~104 KB/h, so the cap fired every ~4 days and
+only the last two chunks of a month survived. 2026-06 … 2026-08 lost roughly the
+1st ~10:00 to the 23rd–26th on both units — unrecoverable (they were on `/mnt/T`,
+UFS on a USB stick, no snapshots).
 
-**Why:** the surviving chunks show unbroken 5 s posting at exactly the rate that
-predicts the rotation interval, and the same calendar months in 2019–2025 are
-single 40–65 MB files — so this is the sink discarding data, not the meters going
-quiet. It is silent: no error anywhere, and a month simply reads short.
+**Recovered and restored:** `//bsd/ARCHIVE/ESP_LOGS/RECOVERED/` holds 42,164 rows
+— the first ~10 h of 2026-06-01, 07-01 and 08-01 for both meters, from the old
+monthly rsync's copies preserved in POOL/ARCHIVE snapshots. Kept in a
+subdirectory so nothing in the sink dir is a file the sink did not write.
 
-**How to apply:** for any month from 2026-06 on, read `<file>.csv.1` as well as
-`<file>.csv`, and never treat a month's row count as a measure of uptime. The fix
-belongs in C_ESP's `http_server.py` (numbered suffixes or a per-file rate limit,
-keeping the disk-fill protection) — reported to the home-servers session
-2026-09-04. See [[power-log-data-flow]].
+**Fix written, NOT deployed:** C_ESP branch `logsink-nondestructive-rotation`
+(57154d0, pushed to GitHub+HOME). Rotation becomes `<file>.<YYYYmmdd-HHMMSS>`,
+never overwriting; disk protection moves to a per-file rows/minute limit plus a
+directory-quota alert, neither of which deletes. Deploying needs an
+`http_server` restart, which drops in-flight POSTs — the user's call.
+
+**Why it stayed invisible:** the sink returned 200 to the device and logged only
+"Rotated <file>"; nothing reported data as lost. Retention is no backstop —
+POOL/ARCHIVE's weekly snapshots have not fired since 2026-08-09, so a rotated
+chunk lives ~7 days in the dailies and is then gone.
+
+**How to apply:** read a month as every `<name>.csv*` plus `RECOVERED/<name>.csv`,
+sorted by row timestamp — `MATLAB/month_chunks.m` does this; never glob the bare
+`.csv` alone. Watch `EVR_Balance.log` and `OldEVR.log`, both ~80 % of the cap.
+See [[power-log-data-flow]] and [[epm-main-unreliable-for-years]].

@@ -1,2 +1,3 @@
 - [Power log data flow](power-log-data-flow.md) — every reader goes to `//bsd/ARCHIVE/ESP_LOGS`; `/mnt/T` still answers but is frozen at 2026-09-02.
-- [ESP log sink rotation truncates months](esp-log-sink-rotation-truncates-months.md) — http_server.py's 10 MiB rotation overwrites the single `.1`, so each month since 2026-06 keeps only its last ~4-9 days.
+- [ESP log sink rotation truncates months](esp-log-sink-rotation-truncates-months.md) — the 10 MiB rotation overwrote its single `.1` and destroyed Jun–Aug 2026; fix pushed, deploy pending; read every chunk plus `RECOVERED/`.
+- [EPM_main unreliable for years](epm-main-unreliable-for-years.md) — 9–63 % coverage since 2020, and 4.5 months of payload-free rows in 2025 that every liveness check read as green.
