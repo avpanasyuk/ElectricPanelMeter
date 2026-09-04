@@ -101,9 +101,49 @@ Confirmed here independently, with no plug in the chain — paired 1-minute diff
 over 2026-08/09, selecting the 350 minutes where port 9 steps >3σ: **the step lands in
 `Main Black` and nowhere else** (`Main Red` 0.032, `Subpanel Black` 0.007, `Subpanel Red`
 0.031, `26` 0.000). A GEC CT would show as a fraction of the neutral *unbalance*, never
-1:1 into one leg. `conf_main_v0.m` port 9 is relabelled `x570 branch (GEC before
-2024-06)` — era-explicit, because the conf is applied retroactively to all v0 main data
-and no single name is correct for both sides of the move.
+1:1 into one leg.
+
+### Dating the move: it is 2024-10 — not 2024-06, and not 2026-08
+
+Scale-free shape test: correlation of the 1-minute difference in port 9 with each feeder,
+over **all** minutes, no selection. Selection and slopes both mislead here — port 9 sits
+in the residual for most of this span, so its steps are near-noise and slopes blow up to
+100+. Correlation is scale-free and survives that.
+
+⚠ In this table `sub_r` and `sub_b` mirror `red` and `black` exactly — an artefact of
+signing each channel by its own long-run mean. **The informative comparison is r_red
+against r_black**, as magnitudes.
+
+| era | raw p9−gnd median | r_red | r_black | shape |
+|---|---|---|---|---|
+| 2019-06/07 | −1124 | 0.720 | 0.242 | both legs |
+| 2022-06/07 | −866 | 0.807 | 0.359 | both legs |
+| 2024-03/04 | −4412 | 0.505 | 0.496 | both legs |
+| 2024-08/09 | **+8068** | 0.296 | 0.107 | both legs |
+| 2024-10/11 | −60 | 0.211 | **0.694** | **one leg** |
+| 2026-02/03 | +252 | 0.075 | 0.239 | one leg |
+| 2026-08/09 | +1370 | 0.012 | 0.277 | one leg |
+
+**Two separate events, both now dated:**
+1. **June–July 2024** (his panel work): the raw sign flips −4412 → +8068 and the magnitude
+   nearly doubles, but the shape stays both-legs. The CT was **reversed or repositioned on
+   the earth path**, not moved to a load.
+2. **2024-09 → 2024-10**: the magnitude collapses to ~0 *and* `red` drops away while
+   `black` becomes dominant. **That is the move onto the black-leg branch** — and it is
+   the "second break" this note previously carried as undated and unexplained.
+
+⇒ Port 9 has been a branch channel since **2024-10**, not since 2026-08. Its level stayed
+inside the residual until 2026-08 only because x570 was idle; the *shape* was the branch
+shape throughout. ⚠ The identity as x570 specifically is anchored only at the 2026-08/09
+end, by the plug step. The black-only shape is continuous from 2024-10, so one move is the
+simplest reading — a second move inside that window would not show.
+
+⚠ **There is no data gap and no repo trace at 2024-09/10.** Unlike the June–July work the
+board was not powered down, so the usual tell is absent and the CT was moved a second time
+unrecorded. That is the question if the panel comes up with him.
+
+`conf_main_v0.m` port 9 is relabelled `x570 branch (earth path before 2024-10)` —
+era-explicit, because the conf is applied retroactively to all v0 main data.
 
 ⚠ **Gain: port 9 reads ~1.07× Main Black, bracket [0.97, 1.18]** — so ~1.08 absolute
 against the feeders' ~1.01. HOUSE_POWER's ×1.12 from the plug sits inside that, but so
