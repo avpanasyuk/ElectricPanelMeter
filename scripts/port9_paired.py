@@ -22,7 +22,10 @@ SIGMA_K = 3.0
 
 
 def w(vals, gnd, port, pc):
-    return max(abs(vals[port]) - gnd, 0.0) / COEFF / pc * 1000.0
+    # Signed GND subtraction (it is a common additive offset), magnitude last -- as
+    # read_file.m does it. Against the old max(|col|-gnd,0) this shifts the unbalance by
+    # a constant 2*gnd, so every SLOPE here is unchanged; only intercepts move.
+    return abs(vals[port] - gnd) / COEFF / pc * 1000.0
 
 
 def minute_of(ts):
@@ -56,7 +59,7 @@ for path in sys.argv[1:]:
                 v = [float(x) for x in p[1:]]
             except ValueError:
                 continue
-            g = abs(v[-1])
+            g = float(v[-1])
             unbal = abs(w(v, g, RED, C_FEED) - w(v, g, BLACK, C_FEED))
             b = bins.setdefault(minute_of(p[0]), [[], []])
             b[0].append(unbal)

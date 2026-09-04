@@ -5,9 +5,10 @@ The air handler runs continuously, so 0 W is a fault. The question data can answ
 WHEN: a channel that once read and then stopped is a CT that came off or a breaker that
 changed; a channel that never read is a wiring/installation error dating to the build.
 
-Also prints the RAW column next to the GND reference. Watts hide the distinction --
-max(|col|-|gnd|,0) floors at zero either way -- but the raw values say whether the input
-is carrying a signal at all, or sitting at the same level as the ground channel.
+Also prints the RAW column next to the GND reference, which is what actually answers it:
+a channel sitting at the same level as the ground channel is carrying no signal, whatever
+its watts say. Watts alone cannot show that -- GND is a common additive offset, so a dead
+input lands near zero watts and so does a channel a few counts either side of it.
 """
 import glob
 import os
@@ -44,19 +45,22 @@ for path in files:
             if len(p) != 15:
                 continue
             try:
-                gnd = abs(float(p[-1]))
-                vals = [abs(float(p[i + 2])) for i in range(12)]
+                gnd = float(p[-1])
+                vals = [float(p[i + 2]) for i in range(12)]
             except ValueError:
                 continue
             n += 1
             for i in WATCH:
-                cols[i].append(max(vals[i] - gnd, 0.0) / MAIN_COEFF / PORTS[i][1] * 1000.0)
+                # Signed GND subtraction, as read_file.m does it.
+                cols[i].append((vals[i] - gnd) / MAIN_COEFF / PORTS[i][1] * 1000.0)
             raw10.append(vals[9])
             raw5.append(vals[4])
             rawgnd.append(gnd)
     if n < 100:
         print(f"{label:9} {n:8} (too few rows)")
         continue
-    meds = " ".join(f"{statistics.median(cols[i]):15.1f}" for i in WATCH)
+    # abs() only here, on the monthly median, so the CT orientation does not read as a
+    # negative load; per-row rectification is exactly what read_file.m no longer does.
+    meds = " ".join(f"{abs(statistics.median(cols[i])):15.1f}" for i in WATCH)
     print(f"{label:9} {n:8} {meds} {statistics.median(raw10):9.0f} "
           f"{statistics.median(rawgnd):9.0f} {statistics.median(raw5):9.0f}")

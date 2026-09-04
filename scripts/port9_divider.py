@@ -16,7 +16,9 @@ P = {'red': (1, 18.8), 'black': (3, 18.8), 'gnd_strip': (9, 50.0)}   # 1-based p
 
 
 def watts(vals, gnd, port, pc):
-    return max(abs(vals[port]) - gnd, 0.0) / COEFF / pc * 1000.0
+    # Signed GND subtraction, magnitude last -- as read_file.m does it. Shifts the
+    # unbalance by a constant 2*gnd, so the SLOPE (the share) is unchanged.
+    return abs(vals[port] - gnd) / COEFF / pc * 1000.0
 
 
 for path in sys.argv[1:]:
@@ -32,7 +34,7 @@ for path in sys.argv[1:]:
                 v = [float(x) for x in p[1:]]
             except ValueError:
                 continue
-            g = abs(v[-1])
+            g = float(v[-1])
             unbal = abs(watts(v, g, P['red'][0], P['red'][1])
                         - watts(v, g, P['black'][0], P['black'][1]))
             xs.append(unbal)

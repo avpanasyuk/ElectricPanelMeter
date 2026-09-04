@@ -146,14 +146,19 @@ none of the above analysis settled anything: **one minute with a clamp meter bea
 eight years of logs**, because the logs could not tell a real current from a
 mislabelled CT and the meter could.
 
-## ⛔ "Exactly 0.0 W" means FLOORED, not disconnected
+## ⛔ "Exactly 0.0 W" means FLOORED, not disconnected — in any figure predating 2026-09-04
 
-`read_file.m` computes `max(|col| - |gnd|, 0)`, so any channel whose raw value sits
-below the GND reference reports a flat zero. In 2024-10 **four** main channels read
+`read_file.m` used to compute `max(|col| - |gnd|, 0)`, so any channel whose raw value
+sat below the GND reference reported a flat zero. In 2024-10 **four** main channels read
 0.0 every day — A/C compressor, Grounding strip, 28 Air handler, 40 Lida — and the
 A/C one is simply "October, no cooling". A zero therefore means *below the noise
 reference*, and only a **step in the raw value against a stable reference** says
 something physically changed. Read the raw columns before calling a channel dead.
+
+The clamp is **gone** as of the signed-subtraction fix, so such a channel no longer reads
+0.0 — it reads the magnitude of its residual against GND, which is an artefact of order
+±20 W and not power. Same rule, different symptom: read the raw columns.
+See [[read-file-ground-subtraction-sign]].
 
 ## ⛔ `conf_main_v0.m` channel LABELS are not reliable
 
@@ -192,10 +197,14 @@ cannot calibrate anything and a year-over-year change in it is not a finding.
 
 What does stand: the **GND reference channel steps ~300 → ~550** at the 2025-12
 firmware rebuild (the `/read` fix; the sampling loop was reworked again in
-2026-05). That channel is a grounded mux input, so its magnitude is a noise
-statistic set by samples-per-scan, not by any load — and since it is *subtracted*
-from every channel, a higher floor pushes small channels down. Enough to matter for
-low-power channels across that boundary; not evidence of a gain change.
+2026-05). That channel is a grounded mux input, so it carries the additive offset
+common to every channel, not a load — and since it is *subtracted* from every
+channel, a step in it moves every reading. Not evidence of a gain change, but it is
+**epoch-dependent bias**, and it scales the old code's wrong-sign subtraction on a
+reversed-CT channel as `2·gnd`: ~85 W per reversed channel before the step, ~140 W
+after. `Main Black` is reversed, so pre-fix mains totals are low by that much and the
+error nearly doubles across the 2025-12 boundary.
+See [[read-file-ground-subtraction-sign]].
 
 **No validated constant load exists in this data**, so gain stability across
 firmware epochs is currently unmeasured in either direction. A known resistive load

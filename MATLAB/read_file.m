@@ -38,7 +38,7 @@ function [price, hour, Watts] = read_file(filename, conf)
     epoch(human) = posixtime(t);
   end
 
-  m = [epoch, abs(double(parts(:, 2:end)))]; % ADC cols: abs; unparseable -> NaN
+  m = [epoch, double(parts(:, 2:end))]; % signed ADC cols; unparseable -> NaN
   m = m(~any(isnan(m), 2), :); % drop rows with any bad field
   % Chunks are pooled above, so order the rows by time before anything downstream
   % (break detection, trapz) reads a difference between consecutive rows.
@@ -54,15 +54,27 @@ function [price, hour, Watts] = read_file(filename, conf)
   % let's mark breaks > 10 min
   breaks = unique([1;find(AVP.diff(hour) > 1/6)+1;numel(hour)+1]);
 
-  Watts = max(m(:,3:end-1) - repmat(m(:,end),1,size(m,2)-3),0); % ADC times ADC data, ground subtracted
+  % Every ADC column is one cov(V,I) estimate over a single free-running 60 Hz window,
+  % so it is SIGNED and it scatters widely about the true power. Its sign is the CT's
+  % orientation on the conductor, not the direction of power flow.
+  %
+  % The last column is a grounded mux input: no CT, so it carries only the additive
+  % offset every channel picks up. That offset is common to all channels with the same
+  % sign -- a switched load's channel sits on the GND column's own value while its
+  % breaker is off -- so it must be subtracted SIGNED, before any magnitude is taken.
+  % Subtracting it from the magnitude instead understates a reversed-CT channel by
+  % twice the offset (~140 W per feeder on the main board).
+  d = m(:,3:end-1) - repmat(m(:,end),1,size(m,2)-3);
+  % One fixed orientation per channel, from the whole-record mean, applied per row.
+  % abs() per row would rectify the single-cycle scatter of a near-zero channel into a
+  % positive bias, and would hide reverse flow (load-side PV, a battery, a bidirectional
+  % EV charger) as apparent consumption.
+  sgn = sign(mean(d,1));
+  sgn(sgn == 0) = 1; % a channel averaging exactly zero keeps its raw sign
+  Watts = d .* repmat(sgn,size(d,1),1);
   Watts = Watts/conf.coeff; % ADC times ADC to "rms volt * rms volt" conversion factor
   Watts = Watts./repmat([conf.port(:).coeff],size(m,1),1)*1000; % take into account transformers sensitivity
   % and convert "rms volt * rms volt" to "rms volt * rms amp = Watt"
-
-  if exist('indexes','var') && numel(indexes) > 0
-    Watts = Watts(:,indexes);
-    conf.port = conf.port(indexes);
-  end
 
   kWh = 0; Hrs = 0;
   for brI=1:numel(breaks)-1

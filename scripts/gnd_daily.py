@@ -38,13 +38,15 @@ for path in sys.argv[1:]:
             if len(p) != len(PORTS) + 3:
                 continue
             try:
-                gnd = abs(float(p[-1]))
-                vals = [abs(float(p[i + 2])) for i in range(len(PORTS))]
+                gnd = float(p[-1])
+                vals = [float(p[i + 2]) for i in range(len(PORTS))]
             except ValueError:
                 continue
             d = days.setdefault(day_of(p[0]), [[] for _ in PORTS])
             for i, (_, pc) in enumerate(PORTS):
-                d[i].append(max(vals[i] - gnd, 0.0) / MAIN_COEFF / pc * 1000.0)
+                # Signed GND subtraction, magnitude last: GND is a common additive
+                # offset, so rectifying per row biases a near-zero channel upward.
+                d[i].append(abs(vals[i] - gnd) / MAIN_COEFF / pc * 1000.0)
 
 keys = sorted(k for k in days if len(days[k][0]) > 2000)   # drop stub days
 med = {k: [statistics.median(c) for c in days[k]] for k in keys}

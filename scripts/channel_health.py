@@ -1,6 +1,10 @@
 #!/usr/local/bin/python3
 """Per-channel median watts for one merged month, using read_file.m's formula.
 
+Watts are SIGNED per row (GND subtracted signed, one fixed orientation per channel)
+exactly as read_file.m does it, so a channel sitting on the noise floor scatters about
+zero instead of being rectified up to a positive median.
+
 Point: is a channel that read dead in 2026-02 still dead now? A dead-looking channel
 is either an off breaker or a fallen CT, and only the time course separates them --
 a breaker comes back, a fallen CT does not.
@@ -29,22 +33,28 @@ def channel_stats(path, board_coeff, ports):
             if len(p) != len(ports) + 3:      # ts + V + ports + GND
                 continue
             try:
-                gnd = abs(float(p[-1]))
-                vals = [abs(float(p[i + 2])) for i in range(len(ports))]
+                gnd = float(p[-1])
+                vals = [float(p[i + 2]) for i in range(len(ports))]
             except ValueError:
                 continue
             n += 1
             for i, (name, pc) in enumerate(ports):
-                cols[i].append(max(vals[i] - gnd, 0.0) / board_coeff / pc * 1000.0)
+                # Signed: GND is a common ADDITIVE offset, so subtracting it from the
+                # magnitude understates a reversed-CT channel by twice the offset.
+                cols[i].append((vals[i] - gnd) / board_coeff / pc * 1000.0)
     out = []
     for i, (name, _) in enumerate(ports):
         c = cols[i]
         if not c:
             continue
+        # One fixed orientation per channel, from the whole-file mean (CT direction).
+        if statistics.fmean(c) < 0:
+            c = [-x for x in c]
+            cols[i] = c
         c_sorted = sorted(c)
         med = statistics.median(c_sorted)
         p95 = c_sorted[int(0.95 * (len(c_sorted) - 1))]
-        live = 100.0 * sum(1 for x in c if x > 5.0) / len(c)
+        live = 100.0 * sum(1 for x in c if x > 5.0) / len(c)  # signed: noise splits ~50/50
         out.append((name, med, p95, statistics.fmean(c), live))
     return n, out
 
