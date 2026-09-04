@@ -38,6 +38,15 @@ and whether the reading is current at all rather than a front-end artefact. Only
 after that is it worth ranking causes (neutral-to-ground bond fault, a borrowed
 neutral, a switching leakage path).
 
+## ⛔ "Exactly 0.0 W" means FLOORED, not disconnected
+
+`read_file.m` computes `max(|col| - |gnd|, 0)`, so any channel whose raw value sits
+below the GND reference reports a flat zero. In 2024-10 **four** main channels read
+0.0 every day — A/C compressor, Grounding strip, 28 Air handler, 40 Lida — and the
+A/C one is simply "October, no cooling". A zero therefore means *below the noise
+reference*, and only a **step in the raw value against a stable reference** says
+something physically changed. Read the raw columns before calling a channel dead.
+
 ## ⛔ `conf_main_v0.m` channel LABELS are not reliable
 
 Port 10 is labelled `28 Air handler attic`. The attic air handler runs
