@@ -18,9 +18,12 @@ monthly rsync's copies preserved in POOL/ARCHIVE snapshots. Kept in a
 subdirectory so nothing in the sink dir is a file the sink did not write.
 
 **Fix written, NOT deployed:** C_ESP branch `logsink-nondestructive-rotation`
-(57154d0, pushed to GitHub+HOME). Rotation becomes `<file>.<YYYYmmdd-HHMMSS>`,
-never overwriting; disk protection moves to a per-file rows/minute limit plus a
-directory-quota alert, neither of which deletes. Deploying needs an
+(fe71977, pushed to GitHub+HOME). A log whose filename carries the month
+(`--no-rotate-pattern`, default `MONTHLY_NAME_RE`) is never size-rotated, so the
+power logs are one file per month again; other names keep the 10 MiB cap but the
+over-size file is renamed to `<file>.<YYYYmmdd-HHMMSS>` and kept, never
+overwritten. Disk protection against a runaway is a per-file rows/minute limit
+plus a directory-quota alert, neither of which deletes. Deploying needs an
 `http_server` restart, which drops in-flight POSTs — the user's call.
 
 **Why it stayed invisible:** the sink returned 200 to the device and logged only
